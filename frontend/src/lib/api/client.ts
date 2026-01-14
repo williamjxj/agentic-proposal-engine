@@ -311,3 +311,270 @@ export async function recordWorkflowEvent(
   const url = buildApiUrl('/api/analytics/workflow-event')
   await apiClient.post(url, event)
 }
+
+// UI Routers Improvement API Functions
+
+import type {
+  Keyword,
+  KeywordCreate,
+  KeywordUpdate,
+  KeywordFilters,
+  KeywordStats,
+} from '@/types/keywords'
+
+import type {
+  Strategy,
+  StrategyCreate,
+  StrategyUpdate,
+  TestStrategyRequest,
+  TestProposal,
+} from '@/types/strategies'
+
+import type {
+  Document,
+  DocumentFilters,
+  DocumentStats,
+} from '@/types/knowledge-base'
+
+import type {
+  UserSettings,
+  UserPreferences,
+  PlatformCredential,
+  CredentialUpsert,
+  VerificationResult,
+  SubscriptionInfo,
+} from '@/types/settings'
+
+/**
+ * Keywords API
+ */
+export async function listKeywords(
+  filters?: KeywordFilters
+): Promise<Keyword[]> {
+  const backend = getBackendUrl()
+  const params = new URLSearchParams()
+  if (filters?.search) params.append('search', filters.search)
+  if (filters?.is_active !== undefined) params.append('is_active', String(filters.is_active))
+  if (filters?.match_type) params.append('match_type', filters.match_type)
+  
+  const query = params.toString()
+  const url = query ? `${backend}/api/keywords?${query}` : `${backend}/api/keywords`
+  const { data } = await apiClient.get<{ keywords: Keyword[] }>(url)
+  return data?.keywords || []
+}
+
+export async function getKeyword(keywordId: string): Promise<Keyword | null> {
+  const backend = getBackendUrl()
+  const { data } = await apiClient.get<Keyword>(`${backend}/api/keywords/${keywordId}`)
+  return data
+}
+
+export async function createKeyword(data: KeywordCreate): Promise<Keyword | null> {
+  const backend = getBackendUrl()
+  const { data: result } = await apiClient.post<Keyword>(`${backend}/api/keywords`, data)
+  return result
+}
+
+export async function updateKeyword(
+  keywordId: string,
+  data: KeywordUpdate
+): Promise<Keyword | null> {
+  const backend = getBackendUrl()
+  const { data: result } = await apiClient.patch<Keyword>(
+    `${backend}/api/keywords/${keywordId}`,
+    data
+  )
+  return result
+}
+
+export async function deleteKeyword(keywordId: string): Promise<void> {
+  const backend = getBackendUrl()
+  await apiClient.delete(`${backend}/api/keywords/${keywordId}`)
+}
+
+export async function getKeywordStats(keywordId: string): Promise<KeywordStats | null> {
+  const backend = getBackendUrl()
+  const { data } = await apiClient.get<KeywordStats>(
+    `${backend}/api/keywords/${keywordId}/stats`
+  )
+  return data
+}
+
+/**
+ * Strategies API
+ */
+export async function listStrategies(): Promise<Strategy[]> {
+  const backend = getBackendUrl()
+  const { data } = await apiClient.get<{ strategies: Strategy[] }>(`${backend}/api/strategies`)
+  return data?.strategies || []
+}
+
+export async function getStrategy(strategyId: string): Promise<Strategy | null> {
+  const backend = getBackendUrl()
+  const { data } = await apiClient.get<Strategy>(`${backend}/api/strategies/${strategyId}`)
+  return data
+}
+
+export async function createStrategy(data: StrategyCreate): Promise<Strategy | null> {
+  const backend = getBackendUrl()
+  const { data: result } = await apiClient.post<Strategy>(`${backend}/api/strategies`, data)
+  return result
+}
+
+export async function updateStrategy(
+  strategyId: string,
+  data: StrategyUpdate
+): Promise<Strategy | null> {
+  const backend = getBackendUrl()
+  const { data: result } = await apiClient.patch<Strategy>(
+    `${backend}/api/strategies/${strategyId}`,
+    data
+  )
+  return result
+}
+
+export async function deleteStrategy(strategyId: string): Promise<void> {
+  const backend = getBackendUrl()
+  await apiClient.delete(`${backend}/api/strategies/${strategyId}`)
+}
+
+export async function setDefaultStrategy(strategyId: string): Promise<void> {
+  const backend = getBackendUrl()
+  await apiClient.post(`${backend}/api/strategies/${strategyId}/set-default`)
+}
+
+export async function testStrategy(
+  strategyId: string,
+  request?: TestStrategyRequest
+): Promise<TestProposal | null> {
+  const backend = getBackendUrl()
+  const { data } = await apiClient.post<TestProposal>(
+    `${backend}/api/strategies/${strategyId}/test`,
+    request || {}
+  )
+  return data
+}
+
+/**
+ * Knowledge Base API
+ */
+export async function listDocuments(
+  filters?: DocumentFilters
+): Promise<Document[]> {
+  const backend = getBackendUrl()
+  const params = new URLSearchParams()
+  if (filters?.collection) params.append('collection', filters.collection)
+  if (filters?.processing_status) params.append('status', filters.processing_status)
+  if (filters?.search) params.append('search', filters.search)
+  
+  const query = params.toString()
+  const url = query ? `${backend}/api/documents?${query}` : `${backend}/api/documents`
+  const { data } = await apiClient.get<Document[]>(url)
+  return data || []
+}
+
+export async function getDocument(documentId: string): Promise<Document | null> {
+  const backend = getBackendUrl()
+  const { data } = await apiClient.get<Document>(
+    `${backend}/api/documents/${documentId}`
+  )
+  return data
+}
+
+export async function uploadDocument(
+  file: File,
+  collection: string
+): Promise<Document | null> {
+  const backend = getBackendUrl()
+  const formData = new FormData()
+  formData.append('file', file)
+  
+  const queryParams = new URLSearchParams({ collection })
+  const { data } = await apiClient.post<Document>(
+    `${backend}/api/documents/upload?${queryParams.toString()}`,
+    formData,
+    {
+      headers: {
+        // Let browser set Content-Type with boundary for FormData
+      },
+    }
+  )
+  return data
+}
+
+export async function deleteDocument(documentId: string): Promise<void> {
+  const backend = getBackendUrl()
+  await apiClient.delete(`${backend}/api/documents/${documentId}`)
+}
+
+export async function reprocessDocument(documentId: string): Promise<Document | null> {
+  const backend = getBackendUrl()
+  const { data } = await apiClient.post<Document>(
+    `${backend}/api/documents/${documentId}/reprocess`
+  )
+  return data
+}
+
+export async function getDocumentStats(documentId: string): Promise<DocumentStats | null> {
+  const backend = getBackendUrl()
+  const { data } = await apiClient.get<DocumentStats>(
+    `${backend}/api/documents/${documentId}/stats`
+  )
+  return data
+}
+
+/**
+ * Settings API
+ */
+export async function getSettings(): Promise<UserSettings | null> {
+  const backend = getBackendUrl()
+  const { data } = await apiClient.get<UserSettings>(`${backend}/api/settings`)
+  return data
+}
+
+export async function updatePreferences(
+  preferences: UserPreferences
+): Promise<void> {
+  const backend = getBackendUrl()
+  await apiClient.put(`${backend}/api/settings/preferences`, preferences)
+}
+
+export async function listCredentials(): Promise<PlatformCredential[]> {
+  const backend = getBackendUrl()
+  const { data } = await apiClient.get<PlatformCredential[]>(
+    `${backend}/api/settings/credentials`
+  )
+  return data || []
+}
+
+export async function upsertCredential(
+  credential: CredentialUpsert
+): Promise<PlatformCredential | null> {
+  const backend = getBackendUrl()
+  const { data } = await apiClient.post<PlatformCredential>(
+    `${backend}/api/settings/credentials`,
+    credential
+  )
+  return data
+}
+
+export async function deleteCredential(credentialId: string): Promise<void> {
+  const backend = getBackendUrl()
+  await apiClient.delete(`${backend}/api/settings/credentials/${credentialId}`)
+}
+
+export async function verifyCredential(
+  credentialId: string
+): Promise<VerificationResult | null> {
+  const backend = getBackendUrl()
+  const { data } = await apiClient.post<VerificationResult>(
+    `${backend}/api/settings/credentials/${credentialId}/verify`
+  )
+  return data
+}
+
+export async function getSubscription(): Promise<SubscriptionInfo | null> {
+  const backend = getBackendUrl()
+  const { data } = await apiClient.get<SubscriptionInfo>(`${backend}/api/settings/subscription`)
+  return data
+}

@@ -1,0 +1,241 @@
+openapi: 3.0.3
+info:
+  title: Knowledge Base API
+  description: API for managing knowledge base documents
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8000/api
+  - url: https://api.auto-bidder.com/api
+
+tags:
+  - name: knowledge-base
+    description: Document management operations
+
+paths:
+  /knowledge-base/documents:
+    get:
+      tags: [knowledge-base]
+      summary: List user documents
+      operationId: listDocuments
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: collection
+          in: query
+          schema:
+            type: string
+            enum: [case_studies, team_profiles, portfolio, other]
+        - name: processing_status
+          in: query
+          schema:
+            type: string
+            enum: [pending, processing, completed, failed]
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Documents retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  documents:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Document'
+
+    post:
+      tags: [knowledge-base]
+      summary: Upload document
+      operationId: uploadDocument
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+                - collection
+              properties:
+                file:
+                  type: string
+                  format: binary
+                collection:
+                  type: string
+                  enum: [case_studies, team_profiles, portfolio, other]
+      responses:
+        '201':
+          description: Document uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+
+  /knowledge-base/documents/{document_id}:
+    get:
+      tags: [knowledge-base]
+      summary: Get document by ID
+      operationId: getDocument
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: document_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Document retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+
+    delete:
+      tags: [knowledge-base]
+      summary: Delete document
+      operationId: deleteDocument
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: document_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Document deleted
+
+  /knowledge-base/documents/{document_id}/reprocess:
+    post:
+      tags: [knowledge-base]
+      summary: Retry processing failed document
+      operationId: reprocessDocument
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: document_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Reprocessing started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+
+  /knowledge-base/documents/{document_id}/stats:
+    get:
+      tags: [knowledge-base]
+      summary: Get document statistics
+      operationId: getDocumentStats
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: document_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Statistics retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentStats'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Document:
+      type: object
+      required:
+        - id
+        - user_id
+        - filename
+        - file_type
+        - file_size_bytes
+        - collection
+        - processing_status
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        filename:
+          type: string
+          maxLength: 500
+        file_type:
+          type: string
+          enum: [pdf, docx, txt]
+        file_size_bytes:
+          type: integer
+        file_url:
+          type: string
+        collection:
+          type: string
+          enum: [case_studies, team_profiles, portfolio, other]
+        processing_status:
+          type: string
+          enum: [pending, processing, completed, failed]
+        processing_error:
+          type: string
+          nullable: true
+        chunk_count:
+          type: integer
+        token_count:
+          type: integer
+        retrieval_count:
+          type: integer
+        last_retrieved_at:
+          type: string
+          format: date-time
+          nullable: true
+        uploaded_at:
+          type: string
+          format: date-time
+        processed_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    DocumentStats:
+      type: object
+      properties:
+        document_id:
+          type: string
+          format: uuid
+        retrieval_count:
+          type: integer
+        last_retrieved_at:
+          type: string
+          format: date-time
+          nullable: true
+        chunk_count:
+          type: integer
+        token_count:
+          type: integer

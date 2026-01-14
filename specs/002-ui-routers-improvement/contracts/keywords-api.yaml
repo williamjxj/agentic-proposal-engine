@@ -1,0 +1,383 @@
+openapi: 3.0.3
+info:
+  title: Keywords API
+  description: API for managing user search keywords
+  version: 1.0.0
+  contact:
+    name: Auto-Bidder Team
+
+servers:
+  - url: http://localhost:8000/api
+    description: Local development
+  - url: https://api.auto-bidder.com/api
+    description: Production
+
+tags:
+  - name: keywords
+    description: Keyword management operations
+
+paths:
+  /keywords:
+    get:
+      tags:
+        - keywords
+      summary: List user keywords
+      description: Retrieves all keywords for the authenticated user with optional filters
+      operationId: listKeywords
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: search
+          in: query
+          description: Search keywords by keyword text or description
+          required: false
+          schema:
+            type: string
+        - name: is_active
+          in: query
+          description: Filter by active status
+          required: false
+          schema:
+            type: boolean
+        - name: match_type
+          in: query
+          description: Filter by match type
+          required: false
+          schema:
+            type: string
+            enum: [exact, partial, fuzzy]
+      responses:
+        '200':
+          description: Keywords retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  keywords:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Keyword'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    post:
+      tags:
+        - keywords
+      summary: Create new keyword
+      description: Creates a new keyword for the authenticated user
+      operationId: createKeyword
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KeywordCreate'
+      responses:
+        '201':
+          description: Keyword created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Keyword'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '409':
+          description: Keyword already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Conflict"
+                detail: "Keyword already exists for this user"
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /keywords/{keyword_id}:
+    get:
+      tags:
+        - keywords
+      summary: Get keyword by ID
+      description: Retrieves a specific keyword by ID
+      operationId: getKeyword
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: keyword_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Keyword retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Keyword'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    patch:
+      tags:
+        - keywords
+      summary: Update keyword
+      description: Updates an existing keyword
+      operationId: updateKeyword
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: keyword_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KeywordUpdate'
+      responses:
+        '200':
+          description: Keyword updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Keyword'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '409':
+          description: Keyword name conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    delete:
+      tags:
+        - keywords
+      summary: Delete keyword
+      description: Deletes a keyword by ID
+      operationId: deleteKeyword
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: keyword_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Keyword deleted successfully
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /keywords/{keyword_id}/stats:
+    get:
+      tags:
+        - keywords
+      summary: Get keyword statistics
+      description: Retrieves statistics for a keyword (jobs matched, last match date)
+      operationId: getKeywordStats
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: keyword_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Statistics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KeywordStats'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Supabase JWT token
+
+  schemas:
+    Keyword:
+      type: object
+      required:
+        - id
+        - user_id
+        - keyword
+        - is_active
+        - match_type
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        keyword:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+          nullable: true
+        is_active:
+          type: boolean
+        match_type:
+          type: string
+          enum: [exact, partial, fuzzy]
+        jobs_matched:
+          type: integer
+          default: 0
+        last_match_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    KeywordCreate:
+      type: object
+      required:
+        - keyword
+      properties:
+        keyword:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          nullable: true
+        match_type:
+          type: string
+          enum: [exact, partial, fuzzy]
+          default: partial
+        is_active:
+          type: boolean
+          default: true
+
+    KeywordUpdate:
+      type: object
+      properties:
+        keyword:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          nullable: true
+        match_type:
+          type: string
+          enum: [exact, partial, fuzzy]
+        is_active:
+          type: boolean
+
+    KeywordStats:
+      type: object
+      properties:
+        keyword_id:
+          type: string
+          format: uuid
+        jobs_matched:
+          type: integer
+        last_match_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+        detail:
+          type: string
+        field:
+          type: string
+
+  responses:
+    UnauthorizedError:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Unauthorized"
+            detail: "Valid JWT token required"
+
+    BadRequestError:
+      description: Invalid request data
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Validation error"
+            detail: "keyword must be between 1 and 255 characters"
+            field: "keyword"
+
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Not found"
+            detail: "Keyword not found"
+
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Internal server error"
+            detail: "An unexpected error occurred"

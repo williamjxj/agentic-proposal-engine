@@ -1,0 +1,309 @@
+openapi: 3.0.3
+info:
+  title: Strategies API
+  description: API for managing bidding strategies (AI prompt templates)
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8000/api
+  - url: https://api.auto-bidder.com/api
+
+tags:
+  - name: strategies
+    description: Bidding strategy management
+
+paths:
+  /strategies:
+    get:
+      tags: [strategies]
+      summary: List user strategies
+      operationId: listStrategies
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Strategies retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  strategies:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Strategy'
+
+    post:
+      tags: [strategies]
+      summary: Create new strategy
+      operationId: createStrategy
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StrategyCreate'
+      responses:
+        '201':
+          description: Strategy created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Strategy'
+
+  /strategies/{strategy_id}:
+    get:
+      tags: [strategies]
+      summary: Get strategy by ID
+      operationId: getStrategy
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: strategy_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Strategy retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Strategy'
+
+    patch:
+      tags: [strategies]
+      summary: Update strategy
+      operationId: updateStrategy
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: strategy_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StrategyUpdate'
+      responses:
+        '200':
+          description: Strategy updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Strategy'
+
+    delete:
+      tags: [strategies]
+      summary: Delete strategy
+      operationId: deleteStrategy
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: strategy_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Strategy deleted
+
+  /strategies/{strategy_id}/set-default:
+    post:
+      tags: [strategies]
+      summary: Set strategy as default
+      operationId: setDefaultStrategy
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: strategy_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Default strategy updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Strategy'
+
+  /strategies/{strategy_id}/test:
+    post:
+      tags: [strategies]
+      summary: Test strategy (generate sample proposal)
+      operationId: testStrategy
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: strategy_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                job_description:
+                  type: string
+      responses:
+        '200':
+          description: Test proposal generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TestProposal'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Strategy:
+      type: object
+      required:
+        - id
+        - user_id
+        - name
+        - system_prompt
+        - tone
+        - temperature
+        - max_tokens
+        - is_default
+        - use_count
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+          nullable: true
+        system_prompt:
+          type: string
+        tone:
+          type: string
+          enum: [professional, enthusiastic, technical, friendly, formal]
+        focus_areas:
+          type: array
+          items:
+            type: string
+        temperature:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 2
+        max_tokens:
+          type: integer
+          minimum: 100
+          maximum: 4000
+        is_default:
+          type: boolean
+        use_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    StrategyCreate:
+      type: object
+      required:
+        - name
+        - system_prompt
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+        system_prompt:
+          type: string
+        tone:
+          type: string
+          enum: [professional, enthusiastic, technical, friendly, formal]
+          default: professional
+        focus_areas:
+          type: array
+          items:
+            type: string
+        temperature:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 2
+          default: 0.7
+        max_tokens:
+          type: integer
+          minimum: 100
+          maximum: 4000
+          default: 1500
+        is_default:
+          type: boolean
+          default: false
+
+    StrategyUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+        system_prompt:
+          type: string
+        tone:
+          type: string
+          enum: [professional, enthusiastic, technical, friendly, formal]
+        focus_areas:
+          type: array
+          items:
+            type: string
+        temperature:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 2
+        max_tokens:
+          type: integer
+          minimum: 100
+          maximum: 4000
+
+    TestProposal:
+      type: object
+      properties:
+        proposal:
+          type: string
+        test_mode:
+          type: boolean
+          default: true

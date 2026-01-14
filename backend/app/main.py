@@ -61,6 +61,12 @@ app.include_router(health.router, prefix="/health", tags=["health"])
 app.include_router(session.router, prefix="/api", tags=["session"])
 app.include_router(analytics.router, prefix="/api", tags=["analytics"])
 app.include_router(draft.router, prefix="/api", tags=["drafts"])
+# UI Routers Improvement
+from app.routers import keywords, strategies, knowledge_base, settings
+app.include_router(keywords.router, prefix="/api", tags=["keywords"])
+app.include_router(strategies.router, prefix="/api", tags=["strategies"])
+app.include_router(knowledge_base.router, prefix="/api", tags=["knowledge-base"])
+app.include_router(settings.router, prefix="/api", tags=["settings"])
 # Future router for offline sync
 # app.include_router(sync.router, prefix="/api", tags=["sync"])
 

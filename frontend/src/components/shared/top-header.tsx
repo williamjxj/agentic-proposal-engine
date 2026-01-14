@@ -7,6 +7,7 @@
 
 import { useAuth } from '@/hooks/useAuth'
 import { getInitials } from '@/lib/utils'
+import { ThemeSwitcher } from './theme-switcher'
 
 export function TopHeader() {
   const { user, signOut } = useAuth()
@@ -18,6 +19,7 @@ export function TopHeader() {
       </div>
 
       <div className="flex items-center gap-4">
+        <ThemeSwitcher />
         {user && (
           <>
             <div className="flex items-center gap-3">
