@@ -4,13 +4,22 @@
  */
 
 import Link from 'next/link'
+import Image from 'next/image'
 
 export default function HomePage() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
       <main className="container flex flex-col items-center justify-center gap-12 px-4 py-16">
         <div className="flex flex-col items-center gap-4 text-center">
-          <h1 className="text-5xl font-bold tracking-tight sm:text-6xl lg:text-7xl">
+          <Image
+            src="/logo.svg"
+            alt="Auto Bidder"
+            width={200}
+            height={48}
+            className="h-12 w-auto sm:h-16"
+            priority
+          />
+          <h1 className="sr-only text-5xl font-bold tracking-tight sm:text-6xl lg:text-7xl">
             Auto Bidder
           </h1>
           <p className="max-w-2xl text-xl text-muted-foreground">

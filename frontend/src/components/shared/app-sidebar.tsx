@@ -6,6 +6,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { useSessionState } from '@/hooks/useSessionState'
@@ -40,7 +41,16 @@ export function AppSidebar() {
   return (
     <aside className="flex w-64 flex-col border-r bg-card">
       <div className="flex h-16 items-center justify-between border-b px-6">
-        <h1 className="text-xl font-bold">Auto Bidder</h1>
+        <Link href="/dashboard" className="flex items-center gap-2">
+          <Image
+            src="/logo-compact.svg"
+            alt="Auto Bidder"
+            width={140}
+            height={35}
+            className="h-8 w-auto"
+            priority
+          />
+        </Link>
         
         {/* Online/offline indicator */}
         <div className="flex items-center gap-1">

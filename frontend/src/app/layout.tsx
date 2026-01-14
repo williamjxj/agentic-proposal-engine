@@ -13,6 +13,10 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: 'Auto Bidder - AI-Powered Proposal Generation',
   description: 'Reduce proposal writing time from 30 minutes to 2 minutes with AI-powered automation',
+  icons: {
+    icon: '/favicon.svg',
+    apple: '/favicon.svg',
+  },
 }
 
 export default function RootLayout({
