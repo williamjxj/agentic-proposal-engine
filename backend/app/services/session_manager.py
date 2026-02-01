@@ -48,6 +48,10 @@ class SessionManager:
             if not data:
                 return None
             
+            # Map entity_id from database to active_entity_id for model
+            if "entity_id" in data and "active_entity_id" not in data:
+                data["active_entity_id"] = data.pop("entity_id")
+            
             return SessionState(**data)
         except Exception as e:
             logger.error(f"Error getting session state for user {user_id}: {e}")
@@ -73,6 +77,7 @@ class SessionManager:
         """
         try:
             # Convert Pydantic model to dict
+            # Map active_entity_id to entity_id to match database schema
             data_dict: Dict[str, Any] = {
                 "user_id": user_id,
                 "current_path": session_data.current_path,
@@ -80,13 +85,17 @@ class SessionManager:
                     entry.model_dump() for entry in session_data.navigation_history
                 ],
                 "active_entity_type": session_data.active_entity_type,
-                "active_entity_id": session_data.active_entity_id,
+                "entity_id": session_data.active_entity_id,  # Map to database column name
                 "scroll_position": session_data.scroll_position,
                 "filters": session_data.filters,
                 "ui_state": session_data.ui_state,
             }
             
             result = await self.supabase.upsert_session_state(user_id, data_dict)
+            
+            # Map entity_id from database to active_entity_id for model
+            if "entity_id" in result and "active_entity_id" not in result:
+                result["active_entity_id"] = result.pop("entity_id")
             
             return SessionState(**result)
         except Exception as e:
@@ -142,9 +151,9 @@ class SessionManager:
                 update_dict["active_entity_type"] = current.active_entity_type
             
             if session_update.active_entity_id is not None:
-                update_dict["active_entity_id"] = session_update.active_entity_id
+                update_dict["entity_id"] = session_update.active_entity_id  # Map to database column name
             elif current:
-                update_dict["active_entity_id"] = current.active_entity_id
+                update_dict["entity_id"] = current.active_entity_id  # Map to database column name
             
             if session_update.scroll_position is not None:
                 update_dict["scroll_position"] = session_update.scroll_position
@@ -169,6 +178,10 @@ class SessionManager:
             
             # Upsert (create or update)
             result = await self.supabase.upsert_session_state(user_id, update_dict)
+            
+            # Map entity_id from database to active_entity_id for model
+            if "entity_id" in result and "active_entity_id" not in result:
+                result["active_entity_id"] = result.pop("entity_id")
             
             return SessionState(**result)
         except Exception as e:
