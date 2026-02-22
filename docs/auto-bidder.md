@@ -43,6 +43,38 @@ To reduce the time spent on manual proposal writing from **30 minutes to under 2
 
 ## 3. Workflows & Diagrams
 
+## Agentic Auto-Bidder
+
+```mermaid
+flowchart TD
+    subgraph Client_Side ["Client Side (React)"]
+        UI[User Interface] -->|Submit Profile| API[API Gateway]
+    end
+
+    subgraph Backend_Services ["Backend (Node/AWS)"]
+        API -->|Trigger| Auth["Auth Service (Cognito)"]
+        API -->|Event| Ingest[Ingestion Lambda]
+        
+        Ingest -->|Raw Data| DB[(Postgres/DynamoDB)]
+        Ingest -->|Generate Embedding| EmbedModel[Embedding Model]
+    end
+
+    subgraph AI_Layer ["AI & Data Layer"]
+        EmbedModel -->|Vector Store| VectorDB[(Vector Database)]
+        VectorDB -.->|Semantic Search| MatchLambda[Matching Service]
+        MatchLambda -->|Context + Query| LLM[LLM Gateway]
+        LLM -->|Recommendation| API
+    end
+
+    subgraph Operations ["Ops"]
+        Log[CloudWatch/Observability] -.-> API
+        Log -.-> MatchLambda
+    end
+
+    style AI_Layer fill:#e1f5fe,stroke:#01579b
+    style Backend_Services fill:#fff9c4,stroke:#fbc02d
+```
+
 ### User Proposal Generation Workflow
 
 ```mermaid
