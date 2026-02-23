@@ -8,6 +8,7 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { useSessionState } from '@/hooks/useSessionState'
 import { useNavigationTiming } from '@/hooks/useNavigationTiming'
 import { LoadingSkeleton } from '@/components/workflow/progress-overlay'
@@ -19,6 +20,7 @@ interface ProposalFilters {
 }
 
 export default function ProposalsPage() {
+  const router = useRouter()
   const { getFilters, setFilters, getScrollPosition, setScrollPosition, updateActiveEntity } = useSessionState()
   const { measureOperation } = useNavigationTiming()
   const [isLoading, setIsLoading] = useState(true)
@@ -40,18 +42,41 @@ export default function ProposalsPage() {
       
       try {
         await measureOperation('load-proposals', async () => {
-          // Simulate API call
-          await new Promise(resolve => setTimeout(resolve, 600))
+          const { listProposals } = await import('@/lib/api/client')
           
-          // TODO: Replace with actual API call
-          setProposals([
-            { id: '1', title: 'Website Redesign Proposal', status: 'draft', created: '2024-01-12' },
-            { id: '2', title: 'Mobile App Development', status: 'submitted', created: '2024-01-11' },
-            { id: '3', title: 'SEO Optimization Package', status: 'accepted', created: '2024-01-10' },
-          ])
+          // Fetch proposals from API
+          const statusFilter = filters.status === 'all' ? undefined : filters.status
+          const response = await listProposals(statusFilter, 50, 0)
+          
+          // Apply search filter if present
+          let filteredProposals = response.proposals
+          if (filters.search) {
+            const searchLower = filters.search.toLowerCase()
+            filteredProposals = filteredProposals.filter(p => 
+              p.title.toLowerCase().includes(searchLower) ||
+              (p.description && p.description.toLowerCase().includes(searchLower))
+            )
+          }
+          
+          // Apply sorting
+          const sorted = [...filteredProposals].sort((a, b) => {
+            switch (filters.sortBy) {
+              case 'created':
+                return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+              case 'updated':
+                return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+              case 'title':
+                return a.title.localeCompare(b.title)
+              default:
+                return 0
+            }
+          })
+          
+          setProposals(sorted)
         })
       } catch (error) {
         console.error('Error loading proposals:', error)
+        setProposals([])
       } finally {
         setIsLoading(false)
       }
@@ -70,7 +95,7 @@ export default function ProposalsPage() {
     }
 
     restoreScroll()
-  }, [])
+  }, [filters])
 
   // Save scroll position on scroll
   useEffect(() => {
@@ -97,6 +122,10 @@ export default function ProposalsPage() {
     // TODO: Navigate to proposal detail/edit page
   }
 
+  const handleNewProposal = () => {
+    router.push('/proposals/new')
+  }
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -115,7 +144,10 @@ export default function ProposalsPage() {
             Create and manage your project proposals
           </p>
         </div>
-        <button className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+        <button 
+          onClick={handleNewProposal}
+          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+        >
           New Proposal
         </button>
       </div>
@@ -138,8 +170,10 @@ export default function ProposalsPage() {
           <option value="all">All Status</option>
           <option value="draft">Draft</option>
           <option value="submitted">Submitted</option>
-          <option value="accepted">Accepted</option>
-          <option value="rejected">Rejected</option>
+          <option value="responded">Responded</option>
+          <option value="won">Won</option>
+          <option value="lost">Lost</option>
+          <option value="archived">Archived</option>
         </select>
 
         <select
@@ -158,7 +192,10 @@ export default function ProposalsPage() {
         {proposals.length === 0 ? (
           <div className="rounded-lg border border-dashed border-slate-300 p-12 text-center dark:border-slate-700">
             <p className="text-muted-foreground">No proposals found</p>
-            <button className="mt-4 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+            <button 
+              onClick={handleNewProposal}
+              className="mt-4 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            >
               Create First Proposal
             </button>
           </div>
@@ -170,9 +207,16 @@ export default function ProposalsPage() {
               className="cursor-pointer rounded-lg border border-slate-200 p-4 hover:border-primary hover:shadow-md transition-all dark:border-slate-800 dark:hover:border-primary"
             >
               <h3 className="font-semibold">{proposal.title}</h3>
+              {proposal.description && (
+                <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
+                  {proposal.description}
+                </p>
+              )}
               <div className="mt-2 flex items-center gap-4 text-sm text-muted-foreground">
                 <span className="capitalize">{proposal.status}</span>
-                <span>Created: {proposal.created}</span>
+                {proposal.budget && <span>{proposal.budget}</span>}
+                {proposal.timeline && <span>{proposal.timeline}</span>}
+                <span>Created: {new Date(proposal.created_at).toLocaleDateString()}</span>
               </div>
             </div>
           ))

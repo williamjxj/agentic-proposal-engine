@@ -19,8 +19,8 @@ class Settings(BaseSettings):
         populate_by_name=True,
     )
 
-    # OpenAI Configuration
-    openai_api_key: str = Field(..., alias="OPENAI_API_KEY")
+    # OpenAI Configuration (optional, only needed if using OpenAI as LLM provider)
+    openai_api_key: Optional[str] = Field(None, alias="OPENAI_API_KEY")
     openai_embedding_model: str = Field(
         default="text-embedding-3-small", alias="OPENAI_EMBEDDING_MODEL"
     )

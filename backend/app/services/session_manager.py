@@ -124,8 +124,14 @@ class SessionManager:
                     json.dumps(session_data.ui_state) if session_data.ui_state else '{}',
                 )
                 
-                result = dict(row)
-                # Map entity_id from database to active_entity_id for model
+                result = dict(row)                # Convert UUID objects to strings for Pydantic validation
+                if "id" in result and result["id"]:
+                    result["id"] = str(result["id"])
+                if "user_id" in result and result["user_id"]:
+                    result["user_id"] = str(result["user_id"])
+                if "entity_id" in result and result["entity_id"]:
+                    result["entity_id"] = str(result["entity_id"])
+                                # Map entity_id from database to active_entity_id for model
                 if "entity_id" in result and "active_entity_id" not in result:
                     result["active_entity_id"] = result.pop("entity_id")
                 
@@ -202,6 +208,14 @@ class SessionManager:
                 )
                 
                 result = dict(row)
+                # Convert UUID objects to strings for Pydantic validation
+                if "id" in result and result["id"]:
+                    result["id"] = str(result["id"])
+                if "user_id" in result and result["user_id"]:
+                    result["user_id"] = str(result["user_id"])
+                if "entity_id" in result and result["entity_id"]:
+                    result["entity_id"] = str(result["entity_id"])
+                
                 # Map entity_id from database to active_entity_id for model
                 if "entity_id" in result and "active_entity_id" not in result:
                     result["active_entity_id"] = result.pop("entity_id")

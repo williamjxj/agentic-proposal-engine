@@ -5,7 +5,7 @@ This diagram illustrates the end-to-end workflow for generating AI-powered propo
 ## Workflow Overview
 
 ```mermaid
-graph LR
+graph TB
     subgraph "1. Input Collection"
         A[User Inputs]
         B[Project Details]

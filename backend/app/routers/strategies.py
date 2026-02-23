@@ -7,7 +7,7 @@ Implements API contract from contracts/strategies-api.yaml
 
 from typing import Optional
 import logging
-from fastapi import APIRouter, HTTPException, Header, status
+from fastapi import APIRouter, HTTPException, Depends, status
 
 from app.models.strategy import (
     Strategy,
@@ -16,55 +16,14 @@ from app.models.strategy import (
     TestStrategyRequest,
     TestProposal,
 )
+from app.models.auth import UserResponse
 from app.services.strategy_service import strategy_service
 from app.core.errors import AutoBidderError
+from app.routers.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-
-def get_user_id_from_token(authorization: Optional[str] = Header(None)) -> str:
-    """
-    Extract user ID from authorization token.
-    
-    Args:
-        authorization: Authorization header (Bearer token)
-        
-    Returns:
-        User ID extracted from token
-        
-    Note:
-        For development, returns a default user ID if no auth is provided.
-        In production, this should require valid JWT and raise 401 if missing.
-    """
-    # TODO: Replace placeholder auth with proper JWT dependency
-    # Use: from app.routers.auth import get_current_user
-    if not authorization:
-        # For development: return default user ID
-        # In production, uncomment the raise below
-        # raise HTTPException(
-        #     status_code=status.HTTP_401_UNAUTHORIZED,
-        #     detail="Authorization header required",
-        # )
-        logger.warning("No authorization header provided, using default user ID for development")
-        return "00000000-0000-0000-0000-000000000001"
-    
-    try:
-        token = authorization.replace("Bearer ", "")
-        if not token:
-            # For development: return default user ID
-            logger.warning("Empty authorization token, using default user ID for development")
-            return "00000000-0000-0000-0000-000000000001"
-        
-        # Placeholder: return dummy user ID for testing
-        # In production, this must be replaced with real JWT verification
-        return "00000000-0000-0000-0000-000000000001"
-    except Exception as e:
-        logger.error(f"Error extracting user ID from token: {e}")
-        # For development: return default user ID instead of raising
-        logger.warning(f"Using default user ID due to error: {e}")
-        return "00000000-0000-0000-0000-000000000001"
 
 
 @router.get(
@@ -74,11 +33,11 @@ def get_user_id_from_token(authorization: Optional[str] = Header(None)) -> str:
     summary="List user strategies",
 )
 async def list_strategies(
-    authorization: Optional[str] = Header(None),
+    current_user: UserResponse = Depends(get_current_user),
 ) -> dict:
     """List all strategies for the authenticated user."""
     try:
-        user_id = get_user_id_from_token(authorization)
+        user_id = current_user.id
         strategies = await strategy_service.list_strategies(user_id)
         return {"strategies": [s.model_dump() for s in strategies]}
     except AutoBidderError as e:
@@ -103,11 +62,11 @@ async def list_strategies(
 )
 async def get_strategy(
     strategy_id: str,
-    authorization: Optional[str] = Header(None),
+    current_user: UserResponse = Depends(get_current_user),
 ) -> Strategy:
     """Get a specific strategy by ID."""
     try:
-        user_id = get_user_id_from_token(authorization)
+        user_id = current_user.id
         strategy = await strategy_service.get_strategy(strategy_id, user_id)
         if not strategy:
             raise HTTPException(
@@ -139,11 +98,11 @@ async def get_strategy(
 )
 async def create_strategy(
     strategy_data: StrategyCreate,
-    authorization: Optional[str] = Header(None),
+    current_user: UserResponse = Depends(get_current_user),
 ) -> Strategy:
     """Create a new strategy."""
     try:
-        user_id = get_user_id_from_token(authorization)
+        user_id = current_user.id
         strategy = await strategy_service.create_strategy(user_id, strategy_data)
         return strategy
     except AutoBidderError as e:
@@ -175,11 +134,11 @@ async def create_strategy(
 async def update_strategy(
     strategy_id: str,
     strategy_data: StrategyUpdate,
-    authorization: Optional[str] = Header(None),
+    current_user: UserResponse = Depends(get_current_user),
 ) -> Strategy:
     """Update an existing strategy."""
     try:
-        user_id = get_user_id_from_token(authorization)
+        user_id = current_user.id
         strategy = await strategy_service.update_strategy(strategy_id, user_id, strategy_data)
         return strategy
     except AutoBidderError as e:
@@ -211,11 +170,11 @@ async def update_strategy(
 )
 async def delete_strategy(
     strategy_id: str,
-    authorization: Optional[str] = Header(None),
+    current_user: UserResponse = Depends(get_current_user),
 ) -> None:
     """Delete a strategy."""
     try:
-        user_id = get_user_id_from_token(authorization)
+        user_id = current_user.id
         await strategy_service.delete_strategy(strategy_id, user_id)
     except AutoBidderError as e:
         logger.error(f"Error deleting strategy: {e}")
@@ -245,11 +204,11 @@ async def delete_strategy(
 )
 async def set_default_strategy(
     strategy_id: str,
-    authorization: Optional[str] = Header(None),
+    current_user: UserResponse = Depends(get_current_user),
 ) -> Strategy:
     """Set a strategy as default, unmarking all others."""
     try:
-        user_id = get_user_id_from_token(authorization)
+        user_id = current_user.id
         strategy = await strategy_service.set_default_strategy(strategy_id, user_id)
         return strategy
     except AutoBidderError as e:
@@ -275,11 +234,11 @@ async def set_default_strategy(
 async def test_strategy(
     strategy_id: str,
     request: Optional[TestStrategyRequest] = None,
-    authorization: Optional[str] = Header(None),
+    current_user: UserResponse = Depends(get_current_user),
 ) -> TestProposal:
     """Test a strategy by generating a sample proposal."""
     try:
-        user_id = get_user_id_from_token(authorization)
+        user_id = current_user.id
         job_description = request.job_description if request else None
         proposal = await strategy_service.test_strategy(strategy_id, user_id, job_description)
         return proposal

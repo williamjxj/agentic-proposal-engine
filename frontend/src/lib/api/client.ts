@@ -79,13 +79,28 @@ class ApiClient {
         console.log(`[ApiClient] ${options.method || 'GET'} ${finalUrl}`)
       }
 
+      // Prepare the body - don't stringify FormData
+      let body: any = undefined
+      if (options.body) {
+        if (options.body instanceof FormData) {
+          // Send FormData as-is (browser will set proper Content-Type with boundary)
+          body = options.body
+        } else {
+          // Stringify non-FormData bodies (JSON)
+          body = JSON.stringify(options.body)
+        }
+      }
+
+      // Prepare headers - don't set Content-Type for FormData
+      const finalHeaders: HeadersInit = { ...headers, ...options.headers }
+      if (options.body instanceof FormData && 'Content-Type' in finalHeaders) {
+        delete (finalHeaders as any)['Content-Type']
+      }
+
       const response = await fetch(finalUrl, {
         ...options,
-        headers: {
-          ...headers,
-          ...options.headers,
-        },
-        body: options.body ? JSON.stringify(options.body) : undefined,
+        headers: finalHeaders,
+        body,
       })
 
       // Handle non-JSON responses (e.g., 404 from Next.js)
@@ -492,12 +507,7 @@ export async function uploadDocument(
   const queryParams = new URLSearchParams({ collection })
   const { data } = await apiClient.post<Document>(
     `${backend}/api/documents/upload?${queryParams.toString()}`,
-    formData,
-    {
-      headers: {
-        // Let browser set Content-Type with boundary for FormData
-      },
-    }
+    formData
   )
   return data
 }
@@ -577,4 +587,63 @@ export async function getSubscription(): Promise<SubscriptionInfo | null> {
   const backend = getBackendUrl()
   const { data } = await apiClient.get<SubscriptionInfo>(`${backend}/api/settings/subscription`)
   return data
+}
+
+/**
+ * Proposals API
+ */
+export async function listProposals(
+  status?: string,
+  limit?: number,
+  offset?: number
+): Promise<{ proposals: any[]; total: number }> {
+  const backend = getBackendUrl()
+  const params = new URLSearchParams()
+  if (status) params.append('status', status)
+  if (limit) params.append('limit', limit.toString())
+  if (offset) params.append('offset', offset.toString())
+  
+  const url = `${backend}/api/proposals${params.toString() ? '?' + params.toString() : ''}`
+  const { data } = await apiClient.get<{ proposals: any[]; total: number }>(url)
+  return data || { proposals: [], total: 0 }
+}
+
+export async function getProposal(proposalId: string): Promise<any | null> {
+  const backend = getBackendUrl()
+  const { data } = await apiClient.get<any>(`${backend}/api/proposals/${proposalId}`)
+  return data
+}
+
+export async function createProposal(proposalData: any): Promise<any | null> {
+  const backend = getBackendUrl()
+  const { data } = await apiClient.post<any>(`${backend}/api/proposals`, proposalData)
+  return data
+}
+
+export async function submitProposalFromDraft(
+  entityType: string,
+  entityId: string
+): Promise<any | null> {
+  const backend = getBackendUrl()
+  const { data } = await apiClient.post<any>(
+    `${backend}/api/proposals/from-draft/${entityType}/${entityId}`
+  )
+  return data
+}
+
+export async function updateProposal(
+  proposalId: string,
+  proposalData: any
+): Promise<any | null> {
+  const backend = getBackendUrl()
+  const { data } = await apiClient.put<any>(
+    `${backend}/api/proposals/${proposalId}`,
+    proposalData
+  )
+  return data
+}
+
+export async function deleteProposal(proposalId: string): Promise<void> {
+  const backend = getBackendUrl()
+  await apiClient.delete(`${backend}/api/proposals/${proposalId}`)
 }

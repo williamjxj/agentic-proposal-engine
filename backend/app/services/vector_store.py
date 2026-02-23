@@ -98,15 +98,23 @@ class VectorStoreService:
             ids = [f"{document_id}_chunk_{i}" for i in range(len(chunks))]
 
             # Add default metadata if not provided
+            # Convert UUIDs to strings for ChromaDB compatibility
             if metadatas is None:
                 metadatas = [
                     {
-                        "document_id": document_id,
-                        "user_id": user_id,
+                        "document_id": str(document_id),
+                        "user_id": str(user_id),
                         "chunk_index": i,
                         "collection": collection_name,
                     }
                     for i in range(len(chunks))
+                ]
+            else:
+                # Ensure all metadata values are ChromaDB-compatible types
+                metadatas = [
+                    {k: str(v) if not isinstance(v, (str, int, float, bool)) else v 
+                     for k, v in metadata.items()}
+                    for metadata in metadatas
                 ]
 
             # Add to ChromaDB
@@ -184,8 +192,8 @@ class VectorStoreService:
         try:
             collection = self.get_or_create_collection(collection_name, user_id)
 
-            # Delete all chunks with matching document_id
-            collection.delete(where={"document_id": document_id})
+            # Delete all chunks with matching document_id (convert to string for ChromaDB)
+            collection.delete(where={"document_id": str(document_id)})
 
             logger.info(f"Deleted document {document_id} from {collection_name}")
         except Exception as e:

@@ -7,7 +7,7 @@ Implements API contract from contracts/draft-api.yaml
 
 from typing import Optional
 import logging
-from fastapi import APIRouter, HTTPException, Header, status
+from fastapi import APIRouter, HTTPException, Depends, status
 
 from app.models.draft import (
     Draft,
@@ -17,38 +17,14 @@ from app.models.draft import (
     DraftConflictResponse,
     DraftCleanupResult,
 )
+from app.models.auth import UserResponse
 from app.services.draft_manager import draft_manager
 from app.core.errors import AutoBidderError, ConflictError
+from app.routers.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-
-def get_user_id_from_token(authorization: Optional[str] = Header(None)) -> str:
-    """Extract user ID from authorization token."""
-    if not authorization:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authorization header required",
-        )
-    
-    try:
-        token = authorization.replace("Bearer ", "")
-        if not token:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid authorization token",
-            )
-        
-        # Placeholder: return dummy user ID for testing
-        return "00000000-0000-0000-0000-000000000001"
-    except Exception as e:
-        logger.error(f"Error extracting user ID from token: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authorization token",
-        )
 
 
 @router.get(
@@ -59,11 +35,11 @@ def get_user_id_from_token(authorization: Optional[str] = Header(None)) -> str:
     description="Get all active drafts for the authenticated user",
 )
 async def list_drafts(
-    authorization: Optional[str] = Header(None),
+    current_user: UserResponse = Depends(get_current_user),
 ) -> DraftListResponse:
     """List all user's drafts."""
     try:
-        user_id = get_user_id_from_token(authorization)
+        user_id = current_user.id
         
         drafts = await draft_manager.list_drafts(user_id)
         
@@ -95,11 +71,11 @@ async def list_drafts(
 async def get_draft(
     entity_type: str,
     entity_id: str,
-    authorization: Optional[str] = Header(None),
+    current_user: UserResponse = Depends(get_current_user),
 ) -> Draft:
     """Get specific draft."""
     try:
-        user_id = get_user_id_from_token(authorization)
+        user_id = current_user.id
         
         # Handle "new" as null entity_id
         parsed_entity_id = None if entity_id == "new" else entity_id
@@ -134,7 +110,7 @@ async def save_draft(
     entity_type: str,
     entity_id: str,
     draft_request: DraftSaveRequest,
-    authorization: Optional[str] = Header(None),
+    current_user: UserResponse = Depends(get_current_user),
 ) -> Draft:
     """
     Save draft with conflict detection.
@@ -142,7 +118,7 @@ async def save_draft(
     Returns 409 Conflict if version mismatch detected.
     """
     try:
-        user_id = get_user_id_from_token(authorization)
+        user_id = current_user.id
         
         # Handle "new" as null entity_id
         parsed_entity_id = None if entity_id == "new" else entity_id
@@ -216,11 +192,11 @@ async def save_draft(
 async def delete_draft(
     entity_type: str,
     entity_id: str,
-    authorization: Optional[str] = Header(None),
+    current_user: UserResponse = Depends(get_current_user),
 ) -> None:
     """Delete draft."""
     try:
-        user_id = get_user_id_from_token(authorization)
+        user_id = current_user.id
         
         # Handle "new" as null entity_id
         parsed_entity_id = None if entity_id == "new" else entity_id

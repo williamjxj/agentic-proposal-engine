@@ -9,6 +9,7 @@ from typing import List, Optional
 from datetime import datetime
 from decimal import Decimal
 import logging
+import json
 
 from app.core.database import get_db_pool
 from app.models.strategy import Strategy, StrategyCreate, StrategyUpdate, TestProposal
@@ -148,7 +149,7 @@ class StrategyService:
                     strategy_data.description,
                     strategy_data.system_prompt,
                     strategy_data.tone,
-                    strategy_data.focus_areas,
+                    json.dumps(strategy_data.focus_areas),  # Convert list to JSON string for JSONB
                     float(strategy_data.temperature),
                     strategy_data.max_tokens,
                     strategy_data.is_default,
@@ -234,7 +235,7 @@ class StrategyService:
                 if strategy_data.focus_areas is not None:
                     param_count += 1
                     update_fields.append(f"focus_areas = ${param_count}")
-                    params.append(strategy_data.focus_areas)
+                    params.append(json.dumps(strategy_data.focus_areas))  # Convert list to JSON string for JSONB
                 
                 if strategy_data.temperature is not None:
                     param_count += 1
@@ -441,6 +442,11 @@ Strategy Configuration:
 
     def _row_to_strategy(self, row) -> Strategy:
         """Convert database row to Strategy model."""
+        # Parse focus_areas from JSONB (can be string or already parsed)
+        focus_areas = row.get("focus_areas", [])
+        if isinstance(focus_areas, str):
+            focus_areas = json.loads(focus_areas)
+        
         return Strategy(
             id=str(row["id"]),
             user_id=str(row["user_id"]),
@@ -448,7 +454,7 @@ Strategy Configuration:
             description=row.get("description"),
             system_prompt=row["system_prompt"],
             tone=row["tone"],
-            focus_areas=row.get("focus_areas", []),
+            focus_areas=focus_areas,
             temperature=Decimal(str(row["temperature"])),
             max_tokens=row["max_tokens"],
             is_default=row["is_default"],

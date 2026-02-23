@@ -99,14 +99,20 @@ export default function NewProposalPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Save current state first
-    await saveNow()
+    try {
+      // Save current state first
+      await saveNow()
 
-    // TODO: Submit proposal to backend
-    console.log('Submitting proposal:', formData)
+      // Submit proposal from draft
+      const { submitProposalFromDraft } = await import('@/lib/api/client')
+      await submitProposalFromDraft('proposal', 'new')
 
-    // Navigate to proposals list
-    router.push('/proposals')
+      // Navigate to proposals list
+      router.push('/proposals')
+    } catch (error) {
+      console.error('Failed to submit proposal:', error)
+      // TODO: Show error message to user
+    }
   }
 
   if (!isInitialized) {

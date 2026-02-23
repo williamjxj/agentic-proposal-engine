@@ -7,58 +7,20 @@ Records user workflow events for performance monitoring and optimization.
 
 from typing import Optional
 import logging
-from fastapi import APIRouter, HTTPException, Header, status
+from fastapi import APIRouter, HTTPException, Depends, status
 
 from app.models.analytics import (
     WorkflowAnalyticsEventCreate,
     WorkflowAnalyticsEvent,
     WorkflowAnalyticsResponse,
 )
+from app.models.auth import UserResponse
 from app.core.errors import AutoBidderError
+from app.routers.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-
-def get_user_id_from_token(authorization: Optional[str] = Header(None)) -> str:
-    """
-    Extract user ID from authorization token.
-    
-    Args:
-        authorization: Authorization header (Bearer token)
-        
-    Returns:
-        User ID extracted from token
-        
-    Raises:
-        HTTPException: If authorization is missing or invalid
-    """
-    if not authorization:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authorization header required",
-        )
-    
-    # TODO: Replace placeholder auth with proper JWT dependency
-    # Use: from app.routers.auth import get_current_user
-    # For now, we'll use a placeholder
-    try:
-        token = authorization.replace("Bearer ", "")
-        if not token:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid authorization token",
-            )
-        
-        # Placeholder: return dummy user ID for testing
-        return "00000000-0000-0000-0000-000000000001"
-    except Exception as e:
-        logger.error(f"Error extracting user ID from token: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authorization token",
-        )
 
 
 @router.post(
@@ -69,20 +31,20 @@ def get_user_id_from_token(authorization: Optional[str] = Header(None)) -> str:
 )
 async def record_workflow_event(
     event: WorkflowAnalyticsEventCreate,
-    authorization: Optional[str] = Header(None),
+    current_user: UserResponse = Depends(get_current_user),
 ) -> dict:
     """
     Record a workflow analytics event.
     
     Args:
         event: Analytics event data
-        authorization: Authorization header
+        current_user: Authenticated user from JWT token
         
     Returns:
         Success confirmation
     """
     try:
-        user_id = get_user_id_from_token(authorization)
+        user_id = current_user.id
         
         # Analytics recording disabled (PostgreSQL direct implementation pending)
         # TODO: Implement direct PostgreSQL analytics recording if needed
@@ -116,20 +78,20 @@ async def record_workflow_event(
 )
 async def record_workflow_events_batch(
     events: list[WorkflowAnalyticsEventCreate],
-    authorization: Optional[str] = Header(None),
+    current_user: UserResponse = Depends(get_current_user),
 ) -> dict:
     """
     Record multiple workflow analytics events in batch.
     
     Args:
         events: List of analytics event data
-        authorization: Authorization header
+        current_user: Authenticated user from JWT token
         
     Returns:
         Success confirmation with count
     """
     try:
-        user_id = get_user_id_from_token(authorization)
+        user_id = current_user.id
         
         # Analytics recording disabled (PostgreSQL direct implementation pending)
         # TODO: Implement direct PostgreSQL analytics recording if needed
@@ -160,20 +122,20 @@ async def record_workflow_events_batch(
 )
 async def get_workflow_metrics(
     time_period: str = "7d",
-    authorization: Optional[str] = Header(None),
+    current_user: UserResponse = Depends(get_current_user),
 ) -> dict:
     """
     Get aggregated workflow metrics for user.
     
     Args:
         time_period: Time period for metrics (e.g., '7d', '30d')
-        authorization: Authorization header
+        current_user: Authenticated user from JWT token
         
     Returns:
         Aggregated workflow metrics
     """
     try:
-        user_id = get_user_id_from_token(authorization)
+        user_id = current_user.id
         
         # TODO: Implement metrics aggregation from workflow_analytics table
         # For now, return placeholder data

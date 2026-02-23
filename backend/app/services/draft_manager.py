@@ -7,6 +7,7 @@ Uses PostgreSQL connection pool for database operations.
 
 from typing import Optional, List, Dict, Any
 import logging
+import json
 from datetime import datetime, timedelta
 
 from app.models.draft import (
@@ -35,6 +36,24 @@ class DraftManager:
         """Initialize draft manager."""
         self.conflict_resolver = ConflictResolver()
     
+    def _row_to_draft(self, row) -> Draft:
+        """
+        Convert database row to Draft model.
+        
+        Handles UUID to string conversion for Pydantic validation.
+        """
+        return Draft(
+            id=str(row["id"]),
+            user_id=str(row["user_id"]),
+            entity_type=row["entity_type"],
+            entity_id=str(row["entity_id"]) if row["entity_id"] else None,
+            draft_data=row["draft_data"],
+            version=row["version"],
+            last_saved_at=row["last_saved_at"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+    
     async def list_drafts(self, user_id: str) -> List[Draft]:
         """
         List all active drafts for user.
@@ -59,7 +78,7 @@ class DraftManager:
                     """,
                     user_id
                 )
-                return [Draft(**dict(row)) for row in rows]
+                return [self._row_to_draft(row) for row in rows]
         except Exception as e:
             logger.error(f"Error listing drafts for user {user_id}: {e}")
             raise AutoBidderError(f"Failed to list drafts: {e}")
@@ -100,7 +119,7 @@ class DraftManager:
                 if not row:
                     return None
                 
-                return Draft(**dict(row))
+                return self._row_to_draft(row)
         except Exception as e:
             logger.error(f"Error getting draft: {e}")
             raise AutoBidderError(f"Failed to get draft: {e}")
@@ -155,31 +174,47 @@ class DraftManager:
             # Save to database
             pool = await get_db_pool()
             async with pool.acquire() as conn:
-                row = await conn.fetchrow(
-                    """
-                    INSERT INTO draft_work 
-                    (user_id, entity_type, entity_id, draft_data, draft_version, last_auto_save_at)
-                    VALUES ($1, $2, $3, $4, $5, $6)
-                    ON CONFLICT (user_id, entity_type, entity_id)
-                    WHERE entity_id IS NOT NULL
-                    DO UPDATE
-                    SET draft_data = EXCLUDED.draft_data,
-                        draft_version = EXCLUDED.draft_version,
-                        last_auto_save_at = EXCLUDED.last_auto_save_at,
-                        updated_at = CURRENT_TIMESTAMP
-                    RETURNING id, user_id, entity_type, entity_id, draft_data, 
-                              draft_version as version, last_auto_save_at as last_saved_at,
-                              created_at, updated_at
-                    """,
-                    user_id,
-                    entity_type,
-                    entity_id,
-                    draft_request.draft_data,
-                    new_version,
-                    datetime.now(),
-                )
+                if existing:
+                    # Update existing draft
+                    row = await conn.fetchrow(
+                        """
+                        UPDATE draft_work
+                        SET draft_data = $1,
+                            draft_version = $2,
+                            last_auto_save_at = $3,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE user_id = $4 AND entity_type = $5 AND entity_id IS NOT DISTINCT FROM $6
+                        RETURNING id, user_id, entity_type, entity_id, draft_data, 
+                                  draft_version as version, last_auto_save_at as last_saved_at,
+                                  created_at, updated_at
+                        """,
+                        json.dumps(draft_request.draft_data),
+                        new_version,
+                        datetime.now(),
+                        user_id,
+                        entity_type,
+                        entity_id,
+                    )
+                else:
+                    # Insert new draft
+                    row = await conn.fetchrow(
+                        """
+                        INSERT INTO draft_work 
+                        (user_id, entity_type, entity_id, draft_data, draft_version, last_auto_save_at)
+                        VALUES ($1, $2, $3, $4, $5, $6)
+                        RETURNING id, user_id, entity_type, entity_id, draft_data, 
+                                  draft_version as version, last_auto_save_at as last_saved_at,
+                                  created_at, updated_at
+                        """,
+                        user_id,
+                        entity_type,
+                        entity_id,
+                        json.dumps(draft_request.draft_data),
+                        new_version,
+                        datetime.now(),
+                    )
                 
-                return Draft(**dict(row))
+                return self._row_to_draft(row)
         except AutoBidderError:
             raise
         except Exception as e:

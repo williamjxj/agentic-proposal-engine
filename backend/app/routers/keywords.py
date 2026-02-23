@@ -7,7 +7,7 @@ Implements API contract from contracts/keywords-api.yaml
 
 from typing import Optional
 import logging
-from fastapi import APIRouter, HTTPException, Header, Query, status
+from fastapi import APIRouter, HTTPException, Depends, Query, status
 from fastapi.responses import JSONResponse
 
 from app.models.keyword import (
@@ -16,56 +16,14 @@ from app.models.keyword import (
     KeywordUpdate,
     KeywordStats,
 )
+from app.models.auth import UserResponse
 from app.services.keyword_service import keyword_service
 from app.core.errors import AutoBidderError
+from app.routers.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-
-def get_user_id_from_token(authorization: Optional[str] = Header(None)) -> str:
-    """
-    Extract user ID from authorization token.
-    
-    Args:
-        authorization: Authorization header (Bearer token)
-        
-    Returns:
-        User ID extracted from token
-        
-    Note:
-        For development, returns a default user ID if no auth is provided.
-        In production, this should require valid JWT and raise 401 if missing.
-    """
-    # TODO: Replace placeholder auth with proper JWT dependency
-    # Use: from app.routers.auth import get_current_user
-    # For now, using placeholder similar to session router
-    if not authorization:
-        # For development: return default user ID
-        # In production, uncomment the raise below
-        # raise HTTPException(
-        #     status_code=status.HTTP_401_UNAUTHORIZED,
-        #     detail="Authorization header required",
-        # )
-        logger.warning("No authorization header provided, using default user ID for development")
-        return "00000000-0000-0000-0000-000000000001"
-    
-    try:
-        token = authorization.replace("Bearer ", "")
-        if not token:
-            # For development: return default user ID
-            logger.warning("Empty authorization token, using default user ID for development")
-            return "00000000-0000-0000-0000-000000000001"
-        
-        # TODO: Replace with FastAPI Depends(get_current_user) from auth router
-        # Placeholder: return dummy user ID for testing
-        return "00000000-0000-0000-0000-000000000001"
-    except Exception as e:
-        logger.error(f"Error extracting user ID from token: {e}")
-        # For development: return default user ID instead of raising
-        logger.warning(f"Using default user ID due to error: {e}")
-        return "00000000-0000-0000-0000-000000000001"
 
 
 @router.get(
@@ -79,7 +37,7 @@ async def list_keywords(
     search: Optional[str] = Query(None, description="Search keywords by text or description"),
     is_active: Optional[bool] = Query(None, description="Filter by active status"),
     match_type: Optional[str] = Query(None, description="Filter by match type"),
-    authorization: Optional[str] = Header(None),
+    current_user: UserResponse = Depends(get_current_user),
 ) -> dict:
     """
     List all keywords for the authenticated user.
@@ -88,13 +46,13 @@ async def list_keywords(
         search: Optional search term
         is_active: Optional active status filter
         match_type: Optional match type filter
-        authorization: Bearer token
+        current_user: Authenticated user from JWT token
         
     Returns:
         Dictionary with keywords list
     """
     try:
-        user_id = get_user_id_from_token(authorization)
+        user_id = current_user.id
         keywords = await keyword_service.list_keywords(
             user_id=user_id,
             search=search,
@@ -126,20 +84,20 @@ async def list_keywords(
 )
 async def get_keyword(
     keyword_id: str,
-    authorization: Optional[str] = Header(None),
+    current_user: UserResponse = Depends(get_current_user),
 ) -> Keyword:
     """
     Get a specific keyword by ID.
     
     Args:
         keyword_id: Keyword UUID
-        authorization: Bearer token
+        current_user: Authenticated user from JWT token
         
     Returns:
         Keyword object
     """
     try:
-        user_id = get_user_id_from_token(authorization)
+        user_id = current_user.id
         keyword = await keyword_service.get_keyword(keyword_id, user_id)
         
         if not keyword:
@@ -174,20 +132,20 @@ async def get_keyword(
 )
 async def create_keyword(
     keyword_data: KeywordCreate,
-    authorization: Optional[str] = Header(None),
+    current_user: UserResponse = Depends(get_current_user),
 ) -> Keyword:
     """
     Create a new keyword.
     
     Args:
         keyword_data: Keyword creation data
-        authorization: Bearer token
+        current_user: Authenticated user from JWT token
         
     Returns:
         Created Keyword object
     """
     try:
-        user_id = get_user_id_from_token(authorization)
+        user_id = current_user.id
         keyword = await keyword_service.create_keyword(user_id, keyword_data)
         return keyword
     except AutoBidderError as e:
@@ -220,7 +178,7 @@ async def create_keyword(
 async def update_keyword(
     keyword_id: str,
     keyword_data: KeywordUpdate,
-    authorization: Optional[str] = Header(None),
+    current_user: UserResponse = Depends(get_current_user),
 ) -> Keyword:
     """
     Update an existing keyword.
@@ -228,13 +186,13 @@ async def update_keyword(
     Args:
         keyword_id: Keyword UUID
         keyword_data: Keyword update data
-        authorization: Bearer token
+        current_user: Authenticated user from JWT token
         
     Returns:
         Updated Keyword object
     """
     try:
-        user_id = get_user_id_from_token(authorization)
+        user_id = current_user.id
         keyword = await keyword_service.update_keyword(keyword_id, user_id, keyword_data)
         return keyword
     except AutoBidderError as e:
@@ -267,17 +225,17 @@ async def update_keyword(
 )
 async def delete_keyword(
     keyword_id: str,
-    authorization: Optional[str] = Header(None),
+    current_user: UserResponse = Depends(get_current_user),
 ) -> None:
     """
     Delete a keyword.
     
     Args:
         keyword_id: Keyword UUID
-        authorization: Bearer token
+        current_user: Authenticated user from JWT token
     """
     try:
-        user_id = get_user_id_from_token(authorization)
+        user_id = current_user.id
         await keyword_service.delete_keyword(keyword_id, user_id)
     except AutoBidderError as e:
         logger.error(f"Error deleting keyword: {e}")
@@ -308,20 +266,20 @@ async def delete_keyword(
 )
 async def get_keyword_stats(
     keyword_id: str,
-    authorization: Optional[str] = Header(None),
+    current_user: UserResponse = Depends(get_current_user),
 ) -> KeywordStats:
     """
     Get statistics for a keyword.
     
     Args:
         keyword_id: Keyword UUID
-        authorization: Bearer token
+        current_user: Authenticated user from JWT token
         
     Returns:
         KeywordStats object
     """
     try:
-        user_id = get_user_id_from_token(authorization)
+        user_id = current_user.id
         stats = await keyword_service.get_keyword_stats(keyword_id, user_id)
         
         if not stats:

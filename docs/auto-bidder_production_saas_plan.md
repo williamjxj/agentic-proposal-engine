@@ -1,10 +1,3 @@
----
-name: Auto-Bidder Production SaaS
-overview: "Research-backed outline and todolist to make Auto-Bidder a real production SaaS: what outsource resources are used for bidding, what you need to start (API keys, JWT, etc.), and a prioritized todo list."
-todos: []
-isProject: false
----
-
 # Auto-Bidder: Production SaaS Outline and What You Need to Start
 
 ## 1. App Summary (from docs and codebase)

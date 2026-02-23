@@ -25,7 +25,7 @@ interface WorkflowDB extends DBSchema {
     key: string
     value: {
       entityType: string
-      entityId: string | null
+      entityId: string  // Changed from string | null to string (we normalize null to 'new')
       draftData: Record<string, any>
       cachedAt: string
     }
@@ -221,9 +221,11 @@ export const DraftCache = {
   ): Promise<void> {
     try {
       const database = await initDB()
+      // Use 'new' for null entityId to avoid IndexedDB invalid key error
+      const normalizedEntityId = entityId ?? 'new'
       await database.put('drafts-cache', {
         entityType,
-        entityId,
+        entityId: normalizedEntityId,
         draftData,
         cachedAt: new Date().toISOString(),
       })
@@ -241,7 +243,9 @@ export const DraftCache = {
   ): Promise<Record<string, any> | null> {
     try {
       const database = await initDB()
-      const cached = await database.get('drafts-cache', [entityType, entityId])
+      // Use 'new' as key for null entityId to avoid IndexedDB invalid key error
+      const key = [entityType, entityId ?? 'new']
+      const cached = await database.get('drafts-cache', key)
       return cached?.draftData || null
     } catch (error) {
       console.error('Error reading cached draft:', error)
@@ -255,7 +259,9 @@ export const DraftCache = {
   async remove(entityType: string, entityId: string | null): Promise<void> {
     try {
       const database = await initDB()
-      await database.delete('drafts-cache', [entityType, entityId])
+      // Use 'new' as key for null entityId to avoid IndexedDB invalid key error
+      const key = [entityType, entityId ?? 'new']
+      await database.delete('drafts-cache', key)
     } catch (error) {
       console.error('Error removing cached draft:', error)
     }

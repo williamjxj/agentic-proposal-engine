@@ -15,7 +15,7 @@ import os
 
 from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader, TextLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from openai import OpenAI
+from sentence_transformers import SentenceTransformer
 
 from app.config import settings
 from app.core.database import get_db_pool
@@ -30,8 +30,9 @@ class DocumentService:
     """Service for managing knowledge base documents."""
 
     def __init__(self) -> None:
-        """Initialize document service with OpenAI client and text splitter."""
-        self.openai_client = OpenAI(api_key=settings.openai_api_key)
+        """Initialize document service with embedding model and text splitter."""
+        # Use local sentence-transformers for embeddings (works with any LLM provider)
+        self.embedding_model = SentenceTransformer(settings.embed_model)
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=settings.chunk_size,
             chunk_overlap=settings.chunk_overlap,
@@ -251,22 +252,22 @@ class DocumentService:
                 if not chunk_texts:
                     raise AutoBidderError("No text content extracted from document")
 
-                # Generate embeddings
-                embeddings_response = self.openai_client.embeddings.create(
-                    model=settings.openai_embedding_model,
-                    input=chunk_texts,
-                )
-                embeddings = [item.embedding for item in embeddings_response.data]
+                # Generate embeddings using local sentence-transformers model
+                embeddings = self.embedding_model.encode(
+                    chunk_texts,
+                    convert_to_numpy=True,
+                    show_progress_bar=False
+                ).tolist()
 
                 # Calculate token count (approximate: 1 token ≈ 4 characters)
                 total_chars = sum(len(text) for text in chunk_texts)
                 token_count = total_chars // 4
 
-                # Store in ChromaDB
+                # Store in ChromaDB (convert UUIDs to strings)
                 await vector_store.add_documents(
                     collection_name=collection,
-                    user_id=user_id,
-                    document_id=document_id,
+                    user_id=str(user_id),
+                    document_id=str(document_id),
                     chunks=chunk_texts,
                     embeddings=embeddings,
                 )
@@ -359,12 +360,12 @@ class DocumentService:
             # Get document to find collection
             document = await self.get_document(document_id, user_id)
 
-            # Delete from ChromaDB
+            # Delete from ChromaDB (convert UUIDs to strings)
             try:
                 await vector_store.delete_document(
                     collection_name=document.collection,
-                    user_id=user_id,
-                    document_id=document_id,
+                    user_id=str(user_id),
+                    document_id=str(document_id),
                 )
             except VectorStoreError as e:
                 logger.warning(f"Failed to delete from ChromaDB: {e}")

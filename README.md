@@ -22,11 +22,15 @@ An AI-powered auto-bidding platform that reduces proposal writing time from 30 m
 
 </div>
 
-**To add screenshots:**
-1. Take screenshots of your application
-2. Save them to `assets/images/` directory (e.g., `screenshot-dashboard.png`)
-3. Uncomment the image links above
-4. Replace placeholder names with actual file names
+**📍 Current Navigation Options:**
+- Dashboard - Where you are now (overview & stats)
+- Projects - Track jobs you're bidding on
+- Proposals - Generate & manage AI proposals
+- Knowledge Base - Upload your portfolio documents ⭐ Start here
+- Strategies - AI prompt templates for different tones
+- Keywords - Filter relevant jobs
+- Analytics - Win rates & performance metrics
+- Settings - Account & preferences
 
 ## 🎯 Core Features
 
@@ -271,9 +275,6 @@ See [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) for detailed deployment instructi
 ## 🔗 Links
 
 - [Documentation](./docs/)
-- [API Contracts](./specs/001-ai-auto-bidder-platform/contracts/)
-- [Feature Specification](./specs/001-ai-auto-bidder-platform/spec.md)
-- [Implementation Plan](./specs/001-ai-auto-bidder-platform/plan.md)
 
 ---
 
