@@ -38,6 +38,10 @@ playwright==1.41.1
 beautifulsoup4==4.12.3
 lxml==5.1.0
 
+# HuggingFace Datasets (Mock data source for development)
+datasets>=2.18.0
+pandas>=2.0.0
+
 # Utilities
 python-dotenv==1.0.1
 httpx>=0.24.0,<0.28.0

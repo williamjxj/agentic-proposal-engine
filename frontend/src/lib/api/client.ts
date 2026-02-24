@@ -647,3 +647,146 @@ export async function deleteProposal(proposalId: string): Promise<void> {
   const backend = getBackendUrl()
   await apiClient.delete(`${backend}/api/proposals/${proposalId}`)
 }
+
+// ============================================================================
+// PROJECTS API - HuggingFace Job Discovery
+// ============================================================================
+
+export interface ProjectDiscoverRequest {
+  keywords: string[]
+  platforms?: string[]
+  max_results?: number
+  dataset_id?: string
+}
+
+export interface ProjectFilters {
+  search?: string
+  skills?: string[]
+  min_budget?: number
+  max_budget?: number
+  platforms?: string[]
+}
+
+export interface Project {
+  id: string
+  title: string
+  description: string
+  company: string
+  location?: string
+  platform: string
+  url?: string
+  posted_date?: string
+  deadline?: string
+  budget?: {
+    min: number
+    max: number
+    currency: string
+  }
+  skills: string[]
+  requirements?: string[]
+  discovered_at: string
+  status?: string
+}
+
+export interface ProjectDiscoverResponse {
+  jobs: Project[]
+  total: number
+  dataset_used: string
+  keywords_searched: string[]
+}
+
+export interface ProjectStats {
+  total_jobs: number
+  by_platform: Record<string, number>
+  by_skill: Record<string, number>
+  avg_budget?: number
+}
+
+export interface DatasetInfo {
+  id: string
+  name: string
+  description: string
+  size: string
+  fields: string[]
+  recommended: boolean
+}
+
+/**
+ * Discover new jobs from HuggingFace datasets
+ */
+export async function discoverProjects(
+  request: ProjectDiscoverRequest
+): Promise<ProjectDiscoverResponse | null> {
+  const backend = getBackendUrl()
+  const { data } = await apiClient.post<ProjectDiscoverResponse>(
+    `${backend}/api/projects/discover`,
+    request
+  )
+  return data
+}
+
+/**
+ * List jobs with optional filters
+ */
+export async function listProjects(
+  filters?: ProjectFilters,
+  limit: number = 50,
+  offset: number = 0
+): Promise<{ jobs: Project[]; total: number } | null> {
+  const backend = getBackendUrl()
+  const params = new URLSearchParams()
+  
+  if (filters?.search) params.append('search', filters.search)
+  if (filters?.skills) params.append('skills', filters.skills.join(','))
+  if (filters?.min_budget) params.append('min_budget', filters.min_budget.toString())
+  if (filters?.max_budget) params.append('max_budget', filters.max_budget.toString())
+  if (filters?.platforms) params.append('platforms', filters.platforms.join(','))
+  params.append('limit', limit.toString())
+  params.append('offset', offset.toString())
+  
+  const url = `${backend}/api/projects/list${params.toString() ? '?' + params.toString() : ''}`
+  const { data } = await apiClient.get<{ jobs: Project[]; total: number }>(url)
+  return data
+}
+
+/**
+ * Get project statistics
+ */
+export async function getProjectStats(): Promise<ProjectStats | null> {
+  const backend = getBackendUrl()
+  const { data } = await apiClient.get<ProjectStats>(`${backend}/api/projects/stats`)
+  return data
+}
+
+/**
+ * Get available HuggingFace datasets
+ */
+export async function getAvailableDatasets(): Promise<DatasetInfo[] | null> {
+  const backend = getBackendUrl()
+  const { data } = await apiClient.get<DatasetInfo[]>(`${backend}/api/projects/datasets`)
+  return data
+}
+
+/**
+ * Get single project by ID
+ */
+export async function getProject(projectId: string): Promise<Project | null> {
+  const backend = getBackendUrl()
+  const { data } = await apiClient.get<Project>(`${backend}/api/projects/${projectId}`)
+  return data
+}
+
+/**
+ * Update project status (interested, applied, rejected, etc.)
+ */
+export async function updateProjectStatus(
+  projectId: string,
+  status: string
+): Promise<Project | null> {
+  const backend = getBackendUrl()
+  const { data } = await apiClient.put<Project>(
+    `${backend}/api/projects/${projectId}/status`,
+    { status }
+  )
+  return data
+}

@@ -3,12 +3,13 @@
  * 
  * Create new proposals with auto-save and draft recovery.
  * Demonstrates full auto-save workflow implementation.
+ * Supports pre-filling from job discovery results.
  */
 
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAutoSave } from '@/hooks/useAutoSave'
 import { useDraftRecovery } from '@/hooks/useDraftRecovery'
 import { AutoSaveIndicator, DraftRecoveryBanner } from '@/components/workflow/auto-save-indicator'
@@ -22,8 +23,19 @@ interface ProposalFormData {
   skills: string
 }
 
+interface JobContext {
+  id: string
+  title: string
+  company: string
+  description: string
+  platform: string
+  skills?: string
+  budget?: string
+}
+
 export default function NewProposalPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [formData, setFormData] = useState<ProposalFormData>({
     title: '',
     description: '',
@@ -32,6 +44,41 @@ export default function NewProposalPage() {
     skills: '',
   })
   const [isInitialized, setIsInitialized] = useState(false)
+  const [jobContext, setJobContext] = useState<JobContext | null>(null)
+  const [showJobContext, setShowJobContext] = useState(true)
+
+  // Extract job data from query parameters
+  useEffect(() => {
+    const jobId = searchParams.get('jobId')
+    const jobTitle = searchParams.get('jobTitle')
+    const jobCompany = searchParams.get('jobCompany')
+    const jobDescription = searchParams.get('jobDescription')
+    const jobPlatform = searchParams.get('jobPlatform')
+    const jobSkills = searchParams.get('jobSkills')
+    const jobBudget = searchParams.get('jobBudget')
+
+    if (jobId && jobTitle) {
+      // Set job context for reference
+      setJobContext({
+        id: jobId,
+        title: jobTitle,
+        company: jobCompany || 'Unknown Company',
+        description: jobDescription || '',
+        platform: jobPlatform || 'Unknown',
+        skills: jobSkills || undefined,
+        budget: jobBudget || undefined,
+      })
+
+      // Pre-fill form with job data
+      setFormData((prev) => ({
+        ...prev,
+        title: `Proposal for: ${jobTitle}`,
+        budget: jobBudget || prev.budget,
+        skills: jobSkills || prev.skills,
+        description: prev.description || `I am interested in your project "${jobTitle}". `,
+      }))
+    }
+  }, [searchParams])
 
   // Draft recovery
   const {
@@ -115,6 +162,48 @@ export default function NewProposalPage() {
     }
   }
 
+  // AI-assisted proposal generation
+  const handleAIGenerate = async () => {
+    if (!jobContext) {
+      alert('No job context available for AI generation')
+      return
+    }
+
+    try {
+      // TODO: Call backend API to generate proposal using RAG
+      // This should:
+      // 1. Send job description to knowledge base search
+      // 2. Retrieve relevant documents from user's portfolio
+      // 3. Use AI to generate customized proposal
+      // 4. Pre-fill the form with AI-generated content
+      
+      // For now, show a placeholder message
+      alert(
+        'AI Generation coming soon!\n\n' +
+        'This will use your knowledge base and the job description to:\n' +
+        '• Find relevant past work and skills\n' +
+        '• Generate a customized proposal\n' +
+        '• Suggest timeline and budget\n' +
+        '• Highlight your unique value proposition'
+      )
+      
+      // Placeholder: Pre-fill with AI-style content
+      setFormData((prev) => ({
+        ...prev,
+        description: prev.description + 
+          `\n\nBased on the job requirements for "${jobContext.title}", ` +
+          `I am confident I can deliver exceptional results. My expertise in ${jobContext.skills || 'relevant technologies'} ` +
+          `aligns perfectly with your needs.\n\n` +
+          `I have successfully completed similar projects for ${jobContext.company} ` +
+          `and understand the challenges in this domain. ` +
+          `I can provide a detailed project plan and timeline upon request.`,
+      }))
+    } catch (error) {
+      console.error('Failed to generate AI proposal:', error)
+      alert('Failed to generate proposal. Please try again.')
+    }
+  }
+
   if (!isInitialized) {
     return (
       <div className="space-y-4">
@@ -148,6 +237,62 @@ export default function NewProposalPage() {
         />
       )}
 
+      {/* Job Context Card */}
+      {jobContext && showJobContext && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950">
+          <div className="flex items-start justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">💼</span>
+              <h3 className="font-semibold text-blue-900 dark:text-blue-100">
+                Job Reference
+              </h3>
+            </div>
+            <button
+              onClick={() => setShowJobContext(false)}
+              className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200"
+              title="Hide job context"
+            >
+              ✕
+            </button>
+          </div>
+          
+          <div className="space-y-2 text-sm">
+            <div>
+              <span className="font-medium text-blue-900 dark:text-blue-100">
+                {jobContext.title}
+              </span>
+              <span className="text-blue-700 dark:text-blue-300 ml-2">
+                • {jobContext.company}
+              </span>
+              <span className="text-blue-600 dark:text-blue-400 ml-2">
+                • {jobContext.platform}
+              </span>
+            </div>
+            
+            {jobContext.description && (
+              <p className="text-blue-800 dark:text-blue-200 line-clamp-2">
+                {jobContext.description}
+              </p>
+            )}
+            
+            <div className="flex gap-4 text-blue-700 dark:text-blue-300">
+              {jobContext.budget && (
+                <span>💰 Budget: {jobContext.budget}</span>
+              )}
+              {jobContext.skills && (
+                <span>🔧 Skills: {jobContext.skills}</span>
+              )}
+            </div>
+          </div>
+          
+          <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-900">
+            <p className="text-xs text-blue-700 dark:text-blue-300">
+              💡 Tip: Your proposal will be tailored to this job using AI and your knowledge base
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Proposal Form */}
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Title */}
@@ -168,9 +313,20 @@ export default function NewProposalPage() {
 
         {/* Description */}
         <div>
-          <label htmlFor="description" className="block text-sm font-medium mb-2">
-            Description *
-          </label>
+          <div className="flex items-center justify-between mb-2">
+            <label htmlFor="description" className="block text-sm font-medium">
+              Description *
+            </label>
+            {jobContext && (
+              <button
+                type="button"
+                onClick={handleAIGenerate}
+                className="text-sm text-primary hover:underline flex items-center gap-1"
+              >
+                ✨ AI Generate
+              </button>
+            )}
+          </div>
           <textarea
             id="description"
             value={formData.description}
@@ -261,12 +417,21 @@ export default function NewProposalPage() {
 
       {/* Help Text */}
       <div className="rounded-lg border border-slate-200 p-4 text-sm text-muted-foreground dark:border-slate-800">
-        <p className="font-medium mb-2">💡 Auto-Save is enabled</p>
+        <p className="font-medium mb-2">💡 Tips for creating great proposals</p>
         <ul className="space-y-1 list-disc list-inside">
-          <li>Your work is automatically saved as you type (after 300ms)</li>
-          <li>A checkpoint is created every 10 seconds</li>
-          <li>Drafts are kept for 24 hours</li>
-          <li>You can recover drafts if you leave and come back</li>
+          <li>Auto-save is enabled - your work is saved automatically every 300ms</li>
+          <li>A checkpoint is created every 10 seconds for recovery</li>
+          <li>Drafts are kept for 24 hours and can be recovered later</li>
+          {jobContext && (
+            <>
+              <li className="text-primary font-medium">
+                ✨ Use "AI Generate" to get AI-powered content based on the job and your knowledge base
+              </li>
+              <li className="text-primary">
+                The AI will analyze the job requirements and match them with your portfolio
+              </li>
+            </>
+          )}
         </ul>
       </div>
     </div>
