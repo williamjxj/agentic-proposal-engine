@@ -158,16 +158,17 @@ JWT_SECRET=<your-generated-secret-here>
 
 ## 📚 Documentation
 
-Comprehensive documentation is in [`docs/`](./docs/). See [docs/README.md](./docs/README.md) for the full index.
+Documentation is in [`docs/`](./docs/). See [docs/readme.md](./docs/readme.md) for the full index.
 
 | Doc | Purpose |
 |-----|---------|
-| [**QUICKSTART**](./docs/1-getting-started/QUICKSTART.md) | Setup and run in 10 minutes |
-| [**SETUP_AUTH**](./docs/SETUP_AUTH.md) | JWT and authentication setup |
-| [**PROPOSAL_WORKFLOW_INTEGRATION**](./docs/PROPOSAL_WORKFLOW_INTEGRATION.md) | Discover Jobs → Generate Proposal flow |
-| [**HUGGINGFACE_INTEGRATION**](./docs/HUGGINGFACE_INTEGRATION.md) | Job discovery (HuggingFace datasets) |
-| [**SCRAPING_STATUS**](./docs/SCRAPING_STATUS.md) | Web scraping status (planned) |
-| [**diagrams/**](./docs/diagrams/) | Architecture, auth, workflow diagrams |
+| [setup-and-run](./docs/setup-and-run.md) | Get the app running in ~10 minutes |
+| [setup-auth](./docs/setup-auth.md) | JWT and authentication setup |
+| [user-guides](./docs/user-guides.md) | How to start and use the app in the UI |
+| [proposal-workflow-ui](./docs/proposal-workflow-ui.md) | Discover Jobs → Generate Proposal flow |
+| [huggingface-job-discovery](./docs/huggingface-job-discovery.md) | Job discovery (HuggingFace datasets) |
+| [web-scraping-status](./docs/web-scraping-status.md) | Web scraping status (not implemented) |
+| [diagrams/](./docs/diagrams/) | Architecture, auth, workflow diagrams |
 ```
 auto-bidder/
 ├── frontend/              # Next.js 15 application
@@ -226,7 +227,7 @@ cd backend
 railway up
 ```
 
-See [docs/3-guides/PRODUCTION_DEPLOYMENT.md](./docs/3-guides/PRODUCTION_DEPLOYMENT.md) for detailed deployment.
+See [docs/production-deployment.md](./docs/production-deployment.md) for detailed deployment.
 
 ## 📊 Success Metrics
 
@@ -275,7 +276,7 @@ See [docs/3-guides/PRODUCTION_DEPLOYMENT.md](./docs/3-guides/PRODUCTION_DEPLOYME
 
 ## 🔗 Links
 
-- [Documentation](./docs/)
+- [Documentation](./docs/readme.md)
 
 ---
 

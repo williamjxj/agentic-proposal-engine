@@ -20,7 +20,7 @@ Auto-Bidder is an **AI-powered proposal platform** for freelancers: RAG (ChromaD
 | **Freelancer** | Job discovery (RSS/API), optional bid submit                         | Planned; not implemented                                                                                      | User API key in `platform_credentials`; Freelancer API app credentials if required                                          |
 
 
-**Bidding flow (from [ARCHITECTURE_DIAGRAM.md](docs/2-architecture/ARCHITECTURE_DIAGRAM.md)):** Job Discovery (Upwork/Freelancer) → Store projects in PostgreSQL → RAG context from ChromaDB → LLM proposal generation → Human review → Submit via platform API or copy-paste.
+**Bidding flow (from [architecture-diagram.md](diagrams/architecture-diagram.md)):** Job Discovery (Upwork/Freelancer) → Store projects in PostgreSQL → RAG context from ChromaDB → LLM proposal generation → Human review → Submit via platform API or copy-paste.
 
 ---
 
@@ -70,7 +70,7 @@ High-level order of work (details in implementation phase).
 
 1. **Backend JWT validation** – JWT validation is already implemented in backend routers. Tokens are verified and `user_id` extracted from claims. Files: [keywords.py](backend/app/routers/keywords.py), [strategies.py](backend/app/routers/strategies.py), [knowledge_base.py](backend/app/routers/knowledge_base.py), [settings.py](backend/app/routers/settings.py), [session.py](backend/app/routers/session.py), [draft.py](backend/app/routers/draft.py), [analytics.py](backend/app/routers/analytics.py).
 2. **Encrypt platform credentials** – Encrypt `api_key`, `access_token`, `refresh_token` (and any secrets) in `platform_credentials` at rest (e.g. PostgreSQL pgcrypto or app-level encryption with a key from env). See [settings_service.py](backend/app/services/settings_service.py) and [003_biddinghub_merge.sql](database/migrations/003_biddinghub_merge.sql).
-3. **File Storage Security** – Configure appropriate file upload validation and access controls. Document storage location in README/QUICKSTART.
+3. **File Storage Security** – Configure appropriate file upload validation and access controls. Document storage location in README and setup-and-run.md.
 
 ### 4.2 Core product: AI proposals
 
@@ -88,7 +88,7 @@ High-level order of work (details in implementation phase).
 
 1. **Rate limiting** – Per-user or per-IP limits on proposal generation, uploads, and auth-sensitive endpoints.
 2. **File upload safety** – Validate file type (and optionally content); size limits; optional virus scan for production.
-3. **Draft cleanup** – Scheduled job (e.g. cron or Vercel cron) to delete or archive old draft_work (see [PRODUCTION_DEPLOYMENT.md](docs/3-guides/PRODUCTION_DEPLOYMENT.md)).
+3. **Draft cleanup** – Scheduled job (e.g. cron or Vercel cron) to delete or archive old draft_work (see [production-deployment.md](production-deployment.md)).
 4. **Monitoring** – Sentry (or similar) for backend and frontend; optional APM for latency and errors.
 5. **Env and secrets** – No secrets in repo; production envs in Vercel/Railway; document required vars in README.
 
@@ -96,7 +96,7 @@ High-level order of work (details in implementation phase).
 
 1. **Subscription and usage** – Use `user_profiles` / settings (e.g. `proposals_generated`, `proposals_limit`) to enforce tiers; integrate Stripe (or similar) for billing.
 2. **E2E and regression** – E2E tests for: signup → upload doc → create strategy → generate proposal → save draft. Backend tests for JWT validation and proposal endpoint.
-3. **Docs and runbooks** – Update README, QUICKSTART, and RESTART_GUIDE with production env checklist and “what you need to start” (this section). Add deployment and rollback steps (see PRODUCTION_DEPLOYMENT).
+3. **Docs and runbooks** – Update README, QUICKSTART, and RESTART_GUIDE with production env checklist and “what you need to start” (this section). Add deployment and rollback steps (see [production-deployment.md](production-deployment.md)).
 
 ---
 
@@ -146,8 +146,8 @@ flowchart LR
 
 - [README.md](README.md) – Stack, quick start, env vars  
 - [NEXT_STEPS.md](NEXT_STEPS.md) – Auth, storage, credentials, testing  
-- [docs/2-architecture/ARCHITECTURE_DIAGRAM.md](docs/2-architecture/ARCHITECTURE_DIAGRAM.md) – Job discovery, RAG, platform APIs
-- [docs/3-guides/PRODUCTION_DEPLOYMENT.md](docs/3-guides/PRODUCTION_DEPLOYMENT.md) – Deployment, JWT, monitoring  
+- [diagrams/architecture-diagram.md](diagrams/architecture-diagram.md) – Job discovery, RAG, platform APIs
+- [production-deployment.md](production-deployment.md) – Deployment, JWT, monitoring  
 - [specs/002-ui-routers-improvement/research.md](specs/002-ui-routers-improvement/research.md) – Platform API verification  
 - [database/migrations/003_biddinghub_merge.sql](database/migrations/003_biddinghub_merge.sql) – `platform_credentials` schema
 

@@ -23,7 +23,7 @@ When adding new screenshots to the project:
 ## 📊 Diagrams & Technical Documentation
 
 All diagram documentation (Mermaid, architecture, workflows) has been moved to:
-- **[docs/diagrams/](../../docs/diagrams/)** - Technical diagrams and workflow documentation
+- **[docs/diagrams/](../../docs/diagrams/)** - Technical diagrams (architecture, auth, workflow)
 
 ## 🎨 Image Guidelines
 
@@ -41,4 +41,4 @@ All diagram documentation (Mermaid, architecture, workflows) has been moved to:
 
 ---
 
-**Need help?** Check the [Documentation](../../docs/) or open an issue.
+**Need help?** Check [docs/readme.md](../../docs/readme.md) or open an issue.

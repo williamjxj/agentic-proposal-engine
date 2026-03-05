@@ -32,7 +32,7 @@ interface ProjectFilters {
 
 export default function ProjectsPage() {
   const router = useRouter()
-  const { getFilters, setFilters, getScrollPosition, setScrollPosition, updateActiveEntity } = useSessionState()
+  const { getFilters, setFilters, getScrollPosition, setScrollPosition } = useSessionState()
   const { measureOperation } = useNavigationTiming()
   const [isLoading, setIsLoading] = useState(true)
   const [projects, setProjects] = useState<Project[]>([])
@@ -172,11 +172,6 @@ export default function ProjectsPage() {
     }
   }
 
-  const handleProjectClick = (projectId: string) => {
-    updateActiveEntity('project', projectId)
-    router.push(`/projects/${projectId}`)
-  }
-
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -306,9 +301,8 @@ export default function ProjectsPage() {
         ) : (
           projects.map((project) => (
             <ProjectCard
-              key={project.id}
+              key={project.id || (project as { external_id?: string }).external_id || Math.random()}
               project={project}
-              onClick={() => handleProjectClick(project.id)}
               highlight={filters.search}
             />
           ))
@@ -382,20 +376,20 @@ function StatsCard({ title, value, tip }: { title: string; value: string | numbe
 // Enhanced Project Card
 function ProjectCard({
   project,
-  onClick,
   highlight,
 }: {
   project: Project
-  onClick: () => void
   highlight: string
 }) {
   const router = useRouter()
+  const [expanded, setExpanded] = useState(false)
 
   const handleGenerateProposal = (e: React.MouseEvent) => {
     e.stopPropagation()
 
+    const projectId = project.id || (project as { external_id?: string }).external_id || ''
     const params = new URLSearchParams({
-      jobId: project.id,
+      jobId: projectId,
       jobTitle: project.title,
       jobCompany: project.company,
       jobDescription: project.description,
@@ -418,7 +412,7 @@ function ProjectCard({
       className="group relative rounded-xl border border-slate-200 bg-white p-6 transition-all duration-300 hover:shadow-lg hover:border-primary/20 dark:border-slate-800 dark:bg-slate-900/40"
     >
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-        <div className="flex-1 cursor-pointer" onClick={onClick}>
+        <div className="flex-1 cursor-pointer" onClick={() => setExpanded(!expanded)}>
           <div className="flex items-center gap-3">
             <h3 className="font-bold text-xl text-slate-900 dark:text-slate-100 group-hover:text-primary transition-colors">
               <HighlightText text={project.title} highlight={highlight} />
@@ -444,11 +438,37 @@ function ProjectCard({
         </div>
       </div>
 
-      <div className="mt-4 cursor-pointer" onClick={onClick}>
-        <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed line-clamp-3">
+      <div
+        className="mt-4 cursor-pointer"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <p className={`text-sm text-slate-600 dark:text-slate-400 leading-relaxed ${expanded ? '' : 'line-clamp-3'}`}>
           <HighlightText text={project.description} highlight={highlight} />
         </p>
+        <p className="text-xs text-primary mt-1 font-medium">
+          {expanded ? '▲ Show less' : '▼ View Details'}
+        </p>
       </div>
+
+      {expanded && (
+        <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+          {project.skills && project.skills.length > 0 && (
+            <div className="mb-3">
+              <p className="text-xs font-semibold text-slate-500 uppercase mb-1.5">Required skills</p>
+              <div className="flex flex-wrap gap-2">
+                {project.skills.map((skill, i) => (
+                  <span
+                    key={i}
+                    className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                  >
+                    {skill}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="mt-5 flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap gap-2">
@@ -468,12 +488,6 @@ function ProjectCard({
         </div>
 
         <div className="flex items-center gap-3">
-          <button
-            onClick={onClick}
-            className="text-sm font-semibold text-slate-400 hover:text-primary transition-colors pr-2"
-          >
-            View Details
-          </button>
           <button
             onClick={handleGenerateProposal}
             className="relative overflow-hidden rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground transition-all hover:scale-[1.02] active:scale-95 shadow-sm hover:shadow-md"

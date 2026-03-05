@@ -716,8 +716,8 @@ print(next(iter(ds)))  # Print first record to see fields
 ### Documentation
 
 **Created:**
-- `docs/HUGGINGFACE_INTEGRATION.md` (this document)
-- `docs/SCRAPING_STATUS.md` (comprehensive status)
+- `docs/huggingface-job-discovery.md` (this document)
+- `docs/web-scraping-status.md`
 
 ---
 
@@ -726,7 +726,7 @@ print(next(iter(ds)))  # Print first record to see fields
 - **HuggingFace Datasets:** https://huggingface.co/datasets
 - **Datasets Library Docs:** https://huggingface.co/docs/datasets
 - **Original Claude Analysis:** https://claude.ai/share/0533106b-9011-4a63-a05c-9203565f829b
-- **Related Docs:** [SCRAPING_STATUS.md](SCRAPING_STATUS.md), [QUICK_START.md](QUICK_START.md)
+- **Related Docs:** [web-scraping-status.md](web-scraping-status.md), [setup-and-run.md](setup-and-run.md)
 
 ---
 

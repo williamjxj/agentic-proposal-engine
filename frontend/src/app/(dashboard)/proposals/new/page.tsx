@@ -14,6 +14,7 @@ import { useAutoSave } from '@/hooks/useAutoSave'
 import { useDraftRecovery } from '@/hooks/useDraftRecovery'
 import { AutoSaveIndicator, DraftRecoveryBanner } from '@/components/workflow/auto-save-indicator'
 import { LoadingSkeleton } from '@/components/workflow/progress-overlay'
+import { generateProposalFromJob, listStrategies } from '@/lib/api/client'
 
 interface ProposalFormData {
   title: string
@@ -48,6 +49,10 @@ export default function NewProposalPage() {
   const [error, setError] = useState<string | null>(null)
   const [jobContext, setJobContext] = useState<JobContext | null>(null)
   const [showJobContext, setShowJobContext] = useState(true)
+  const [isAIGenerating, setIsAIGenerating] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
+  const [strategies, setStrategies] = useState<{ id: string; name: string; is_default?: boolean }[]>([])
+  const [selectedStrategyId, setSelectedStrategyId] = useState<string | null>(null)
 
   // Extract job data from query parameters
   useEffect(() => {
@@ -149,6 +154,7 @@ export default function NewProposalPage() {
       jobPlatform: jobContext?.platform,
       jobSkills: jobContext?.skills,
       jobBudget: jobContext?.budget,
+      strategy_id: selectedStrategyId,
     },
     enabled: isInitialized && !showRecoveryPrompt,
     onSaveSuccess: (draft) => {
@@ -162,6 +168,18 @@ export default function NewProposalPage() {
   // Mark as initialized after mount
   useEffect(() => {
     setIsInitialized(true)
+  }, [])
+
+  // Load strategies and default selection
+  useEffect(() => {
+    listStrategies()
+      .then((list) => {
+        setStrategies(list)
+        const defaultStrategy = list.find((s) => s.is_default)
+        if (defaultStrategy) setSelectedStrategyId(defaultStrategy.id)
+        else if (list.length) setSelectedStrategyId(list[0].id)
+      })
+      .catch(() => {})
   }, [])
 
   // Handle form changes
@@ -196,30 +214,43 @@ export default function NewProposalPage() {
     }
   }
 
-  // AI-assisted proposal generation
+  // AI-assisted proposal generation (uses RAG + strategy + LLM)
   const handleAIGenerate = async () => {
     if (!jobContext) {
-      alert('No job context available for AI generation')
+      setAiError('No job context available for AI generation')
       return
     }
 
-    try {
-      // TODO: Call backend API to generate proposal using RAG
+    setIsAIGenerating(true)
+    setAiError(null)
 
-      // Placeholder: Pre-fill with AI-style content
-      setFormData((prev) => ({
-        ...prev,
-        description: prev.description +
-          `\n\nBased on the job requirements for "${jobContext.title}", ` +
-          `I am confident I can deliver exceptional results. My expertise in ${jobContext.skills || 'relevant technologies'} ` +
-          `aligns perfectly with your needs.\n\n` +
-          `I have successfully completed similar projects for ${jobContext.company} ` +
-          `and understand the challenges in this domain. ` +
-          `I can provide a detailed project plan and timeline upon request.`,
-      }))
-    } catch (error) {
-      console.error('Failed to generate AI proposal:', error)
-      alert('Failed to generate proposal. Please try again.')
+    try {
+      const generated = await generateProposalFromJob({
+        job_id: jobContext.id,
+        job_title: jobContext.title,
+        job_description: jobContext.description,
+        job_skills: jobContext.skills ? jobContext.skills.split(',').map((s) => s.trim()) : undefined,
+        strategy_id: selectedStrategyId || undefined,
+      })
+
+      if (generated) {
+        setFormData((prev) => ({
+          ...prev,
+          title: generated.title,
+          description: generated.description,
+          budget: generated.budget || prev.budget,
+          timeline: generated.timeline || prev.timeline,
+          skills: generated.skills?.join(', ') || prev.skills,
+        }))
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to generate proposal'
+      setAiError(message)
+      if (message.includes('429') || message.includes('wait')) {
+        setAiError('Another proposal is being generated. Please wait and try again.')
+      }
+    } finally {
+      setIsAIGenerating(false)
     }
   }
 
@@ -312,10 +343,26 @@ export default function NewProposalPage() {
             </div>
           </div>
 
-          <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-900">
+          <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-900 space-y-2">
             <p className="text-xs text-blue-700 dark:text-blue-300">
-              💡 Tip: Your proposal will be tailored to this job using AI and your knowledge base
+              💡 Your proposal is tailored to this job using AI, your knowledge base, and your selected strategy.
             </p>
+            {strategies.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <label className="text-xs font-medium text-blue-800 dark:text-blue-200">Strategy:</label>
+                <select
+                  value={selectedStrategyId || ''}
+                  onChange={(e) => setSelectedStrategyId(e.target.value || null)}
+                  className="text-xs rounded border border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-800 px-2 py-1 text-blue-900 dark:text-blue-100"
+                >
+                  {strategies.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}{s.is_default ? ' (default)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -348,12 +395,18 @@ export default function NewProposalPage() {
               <button
                 type="button"
                 onClick={handleAIGenerate}
-                className="text-sm text-primary hover:underline flex items-center gap-1"
+                disabled={isAIGenerating}
+                className="text-sm text-primary hover:underline flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                ✨ AI Generate
+                {isAIGenerating ? '⏳ Generating...' : '✨ AI Generate'}
               </button>
             )}
           </div>
+          {aiError && (
+            <p className="text-sm text-red-600 dark:text-red-400 mb-2" role="alert">
+              {aiError}
+            </p>
+          )}
           <textarea
             id="description"
             value={formData.description}
@@ -444,21 +497,12 @@ export default function NewProposalPage() {
 
       {/* Help Text */}
       <div className="rounded-lg border border-slate-200 p-4 text-sm text-muted-foreground dark:border-slate-800">
-        <p className="font-medium mb-2">💡 Tips for creating great proposals</p>
+        <p className="font-medium mb-2">💡 How this works</p>
         <ul className="space-y-1 list-disc list-inside">
-          <li>Auto-save is enabled - your work is saved automatically every 300ms</li>
-          <li>A checkpoint is created every 10 seconds for recovery</li>
-          <li>Drafts are kept for 24 hours and can be recovered later</li>
-          {jobContext && (
-            <>
-              <li className="text-primary font-medium">
-                ✨ Use "AI Generate" to get AI-powered content based on the job and your knowledge base
-              </li>
-              <li className="text-primary">
-                The AI will analyze the job requirements and match them with your portfolio
-              </li>
-            </>
-          )}
+          <li><strong>Fill manually</strong> or use <strong>✨ AI Generate</strong> to auto-fill from the job + your knowledge base + strategy</li>
+          <li><strong>Strategy</strong> (in Job Reference): Controls tone and focus. Create strategies under Strategies in the sidebar.</li>
+          <li><strong>Submit Proposal</strong> saves to Proposals and links it to this job</li>
+          <li>Auto-save keeps drafts; drafts recoverable for 24h</li>
         </ul>
       </div>
     </div>

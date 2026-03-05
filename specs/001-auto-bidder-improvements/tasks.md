@@ -117,7 +117,7 @@
 
 **Purpose**: Final validation and documentation
 
-- [x] T025 [P] Update docs/antigravity-1.md or docs/PROPOSAL_WORKFLOW_INTEGRATION.md with AI Generate wiring completion status
+- [x] T025 [P] Update docs/proposal-workflow-ui.md with AI Generate wiring completion status
 - [x] T026 Run quickstart.md verification flow and fix any regressions
 
 ---

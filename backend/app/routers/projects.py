@@ -93,8 +93,8 @@ async def discover_projects(
             
             logger.info(f"Loaded {len(jobs)} jobs from HuggingFace dataset")
             
-            # TODO: Store jobs in database for persistence
-            # For now, return directly
+            # Ensure id for frontend (use external_id)
+            jobs = [{**j, "id": j.get("id") or j.get("external_id")} for j in jobs]
             
             return ProjectDiscoverResponse(
                 success=True,
@@ -165,6 +165,9 @@ async def list_projects(
             
             if status and status != "all":
                 jobs = [j for j in jobs if j.get("status") == status]
+            
+            # Ensure id for frontend (use external_id)
+            jobs = [{**j, "id": j.get("id") or j.get("external_id")} for j in jobs]
             
             return {
                 "jobs": jobs,

@@ -68,4 +68,4 @@ app/
 
 ## Development
 
-See [docs/1-getting-started/QUICKSTART.md](../docs/1-getting-started/QUICKSTART.md) for full setup. Requires Docker (PostgreSQL + ChromaDB), JWT_SECRET, and LLM API keys.
+See [docs/setup-and-run.md](../docs/setup-and-run.md) for full setup. Requires Docker (PostgreSQL + ChromaDB), JWT_SECRET, and LLM API keys.

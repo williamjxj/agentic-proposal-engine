@@ -555,4 +555,4 @@ Congratulations! Your workflow optimization feature is live! 🎉
 - Technical Details: `IMPLEMENTATION_SUMMARY.md`
 - Quick Start: `QUICK_START.md`
 - Task Status: `specs/001-smooth-workflow/tasks.md`
-- Clarifications: `docs/001-workflow-clarifications.md`
+- Clarifications: See proposal-workflow-ui.md

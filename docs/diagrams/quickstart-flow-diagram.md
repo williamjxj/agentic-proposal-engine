@@ -116,7 +116,7 @@ python -c "import secrets; print(secrets.token_urlsafe(64))"
 
 ## Next Steps After Setup
 
-1. 📚 Read [Architecture Documentation](../2-architecture/ARCHITECTURE_DIAGRAM.md)
-2. 🔐 Review [Authentication Setup](../../docs/SETUP_AUTH.md)
-3. 🚀 Check [Implementation Strategy](../../docs/3-guides/IMPLEMENTATION_STRATEGY.md)
-4. 📊 Explore [API Contracts](../../specs/001-smooth-workflow/contracts/)
+1. 📚 Read [architecture-diagram.md](./architecture-diagram.md)
+2. 🔐 Review [setup-auth.md](../setup-auth.md)
+3. 📋 Check [implementation-progress.md](../implementation-progress.md)
+4. 📊 Explore [API Contracts](../../specs/001-auto-bidder-improvements/contracts/)

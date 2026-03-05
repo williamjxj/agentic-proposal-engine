@@ -648,6 +648,39 @@ export async function deleteProposal(proposalId: string): Promise<void> {
   await apiClient.delete(`${backend}/api/proposals/${proposalId}`)
 }
 
+export interface ProposalGenerateRequest {
+  job_id?: string
+  job_title: string
+  job_description: string
+  job_skills?: string[]
+  strategy_id?: string
+  extra_context?: string
+  custom_instructions?: string
+}
+
+export interface GeneratedProposal {
+  title: string
+  description: string
+  budget?: string
+  timeline?: string
+  skills?: string[]
+  ai_model?: string
+  strategy_id?: string
+  confidence_score?: number
+}
+
+export async function generateProposalFromJob(
+  request: ProposalGenerateRequest
+): Promise<GeneratedProposal | null> {
+  const backend = getBackendUrl()
+  const { data, error } = await apiClient.post<GeneratedProposal>(
+    `${backend}/api/proposals/generate-from-job`,
+    request
+  )
+  if (error) throw new Error(error)
+  return data
+}
+
 // ============================================================================
 // PROJECTS API - HuggingFace Job Discovery
 // ============================================================================

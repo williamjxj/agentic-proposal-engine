@@ -572,8 +572,8 @@ describe('Proposal Workflow Integration', () => {
 
 ## Documentation References
 
-- [HuggingFace Integration](./HUGGINGFACE_INTEGRATION.md)
-- [Scraping Status](./SCRAPING_STATUS.md)
+- [huggingface-job-discovery.md](huggingface-job-discovery.md)
+- [web-scraping-status.md](web-scraping-status.md)
 - [Architecture Diagram](./diagrams/workflow-diagram.md)
 
 ## Metrics & Success Criteria

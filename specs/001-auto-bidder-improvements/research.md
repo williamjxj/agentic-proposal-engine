@@ -55,7 +55,7 @@ Use a post-generation validation step: after LLM produces the proposal, scan for
 Leverage existing DraftManager and `draft_work` table. Ensure frontend calls `updateSessionState` / `recordWorkflowEvent` after fixing URL construction. Add conflict UI when `version` mismatch on save.
 
 ### Rationale
-- PROGRESS.md: Session/analytics API calls were disabled due to malformed URLs
+- implementation-progress.md: Session/analytics APIs were re-enabled after URL fix (T003)
 - Fix root cause in `api/client.ts` URL construction
 - DraftManager already supports versioning; conflict resolution exists in workflow
 
@@ -77,7 +77,7 @@ Leverage existing DraftManager and `draft_work` table. Ensure frontend calls `up
 Enhance HuggingFace `hf_job_source` with keyword filtering. Already implemented: `keyword_filter` in `fetch_hf_jobs`. Ensure projects API passes user keywords from `keywords` table into discover request.
 
 ### Rationale
-- HuggingFace integration (HUGGINGFACE_INTEGRATION.md) supports `keyword_filter`
+- HuggingFace integration (huggingface-job-discovery.md) supports `keyword_filter`
 - Keywords table exists; need to wire user keywords to discover endpoint
 - No new infrastructure; use existing HF service
 
@@ -106,7 +106,7 @@ Document processing is synchronous. Add `processing_status` polling from fronten
 ### Alternatives Considered
 - **A**: Poll document list for status → Chosen for POC
 - **B**: WebSocket for real-time status → Overkill for sync processing
-- **C**: Background queue (Celery) with webhook → Phase 2 (auto-bidder_production_saas_plan)
+- **C**: Background queue (Celery) with webhook → Phase 2 (saas-roadmap.md)
 
 ### Implementation
 - Ensure `processing_status` and `error_message` returned in document list/detail
@@ -142,7 +142,7 @@ Add simple in-flight guard: one concurrent generation per user. Queue or return 
 Verify and fix: Proposal new page `handleAIGenerate` must call `POST /api/proposals/generate-from-job` with job context. Replace placeholder implementation.
 
 ### Rationale
-- PROPOSAL_WORKFLOW_INTEGRATION.md: "AI Generate does nothing - RAG integration pending"
+- proposal-workflow-ui.md: AI Generate wired to POST /api/proposals/generate-from-job
 - Backend endpoint exists and works (ai_service)
 - Critical for demo flow
 
@@ -158,13 +158,13 @@ Verify and fix: Proposal new page `handleAIGenerate` must call `POST /api/propos
 
 ---
 
-## 8. Agentic Architecture (antigravity-1.md)
+## 8. Agentic Architecture
 
 ### Decision
-Current AIService is already "agentic" per antigravity-1: orchestration (RAG + strategy + LLM), contextual memory, strategy-driven persona. No LangGraph/PydanticAI migration for this improvement set. Document and reinforce existing flow.
+Current AIService is already agentic: orchestration (RAG + strategy + LLM), contextual memory, strategy-driven persona. No LangGraph/PydanticAI migration for this improvement set. Document and reinforce existing flow.
 
 ### Rationale
-- antigravity-1: "Orchestration Layer that acts as a cognitive agent"
+- AIService: Orchestration layer (RAG + strategy + LLM)
 - FR-001 to FR-003 achievable with current design
 - LangGraph adds complexity; defer to future "Phase 2 agent" if funding requires
 

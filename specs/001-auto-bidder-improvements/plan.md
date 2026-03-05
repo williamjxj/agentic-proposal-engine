@@ -3,7 +3,7 @@
 **Branch**: `001-auto-bidder-improvements` | **Date**: 2025-03-04 | **Spec**: [spec.md](./spec.md)
 **Input**: Feature specification from `/specs/001-auto-bidder-improvements/spec.md`
 
-**Reference**: [antigravity-1.md](../../docs/antigravity-1.md) - Agentic AI Proposal Engine POC/MVP for funding application
+**Reference**: Implementation builds on existing AIService (RAG + strategy + LLM) for agentic proposal generation.
 
 ## Summary
 
@@ -13,7 +13,7 @@ Implement improvements to the Auto-Bidder platform focusing on:
 3. **Better job discovery** via keyword/skill filtering and ranking (P3)
 4. **Smoother knowledge base** with clear ingestion status and error feedback (P4)
 
-The implementation builds on the existing **agentic AIService** (RAG + strategy + LLM) documented in antigravity-1.md, reinforcing the orchestration layer for funding-demonstrable outcomes.
+The implementation builds on the existing **agentic AIService** (RAG + strategy + LLM) for orchestration and proposal generation.
 
 ## Technical Context
 
