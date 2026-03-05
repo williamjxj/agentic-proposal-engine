@@ -100,8 +100,11 @@ async def discover_projects(
                 success=True,
                 source="huggingface_dataset",
                 dataset_id=HF_DATASET_ID,
+                dataset_used=HF_DATASET_ID,
                 count=len(jobs),
-                jobs=jobs
+                total=len(jobs),
+                jobs=jobs,
+                keywords_searched=keywords
             )
         
         except Exception as e:
@@ -125,6 +128,7 @@ async def list_projects(
     offset: int = Query(0, ge=0),
     platform: Optional[str] = None,
     status: Optional[str] = None,
+    search: Optional[str] = Query(None),
     current_user: UserResponse = Depends(get_current_user)
 ):
     """
@@ -151,7 +155,8 @@ async def list_projects(
         try:
             jobs = fetch_hf_jobs(
                 dataset_id=HF_DATASET_ID,
-                limit=limit
+                limit=limit,
+                keyword_filter=[search] if search else None
             )
             
             # Apply filters

@@ -64,11 +64,13 @@ export function StrategyForm({ strategyId, onClose, onSuccess }: StrategyFormPro
       newErrors.system_prompt = 'System prompt is required'
     }
 
-    if (formData.temperature < 0 || formData.temperature > 2) {
+    const temperature = formData.temperature ?? 0.7
+    if (temperature < 0 || temperature > 2) {
       newErrors.temperature = 'Temperature must be between 0 and 2'
     }
 
-    if (formData.max_tokens < 100 || formData.max_tokens > 4000) {
+    const max_tokens = formData.max_tokens ?? 1500
+    if (max_tokens < 100 || max_tokens > 4000) {
       newErrors.max_tokens = 'Max tokens must be between 100 and 4000'
     }
 
@@ -77,24 +79,43 @@ export function StrategyForm({ strategyId, onClose, onSuccess }: StrategyFormPro
   }
 
   const handleAddFocusArea = () => {
-    if (focusAreaInput.trim() && !formData.focus_areas?.includes(focusAreaInput.trim())) {
+    const input = focusAreaInput.trim()
+    if (!input) return
+
+    // Support comma-separated input
+    const newAreas = input
+      .split(',')
+      .map((a) => a.trim())
+      .filter((a) => a && !formData.focus_areas?.includes(a))
+
+    if (newAreas.length > 0) {
       setFormData({
         ...formData,
-        focus_areas: [...(formData.focus_areas || []), focusAreaInput.trim()],
+        focus_areas: [...(formData.focus_areas || []), ...newAreas],
       })
-      setFocusAreaInput('')
     }
+    setFocusAreaInput('')
   }
 
   const handleRemoveFocusArea = (area: string) => {
     setFormData({
       ...formData,
-      focus_areas: formData.focus_areas?.filter(a => a !== area) || [],
+      focus_areas: formData.focus_areas?.filter((a) => a !== area) || [],
     })
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Auto-add any pending focus area input
+    let finalFocusAreas = formData.focus_areas || []
+    if (focusAreaInput.trim()) {
+      const pendingAreas = focusAreaInput
+        .split(',')
+        .map((a) => a.trim())
+        .filter((a) => a && !finalFocusAreas.includes(a))
+      finalFocusAreas = [...finalFocusAreas, ...pendingAreas]
+    }
 
     if (!validate()) {
       return
@@ -107,13 +128,16 @@ export function StrategyForm({ strategyId, onClose, onSuccess }: StrategyFormPro
           description: formData.description || null,
           system_prompt: formData.system_prompt,
           tone: formData.tone,
-          focus_areas: formData.focus_areas,
+          focus_areas: finalFocusAreas,
           temperature: formData.temperature,
           max_tokens: formData.max_tokens,
         }
         await updateMutation.mutateAsync({ id: strategyId, data: updateData })
       } else {
-        await createMutation.mutateAsync(formData)
+        await createMutation.mutateAsync({
+          ...formData,
+          focus_areas: finalFocusAreas,
+        })
       }
       onSuccess()
     } catch (error: any) {
@@ -334,8 +358,8 @@ export function StrategyForm({ strategyId, onClose, onSuccess }: StrategyFormPro
               {createMutation.isPending || updateMutation.isPending
                 ? 'Saving...'
                 : isEditing
-                ? 'Update'
-                : 'Create'}
+                  ? 'Update'
+                  : 'Create'}
             </button>
           </div>
         </form>

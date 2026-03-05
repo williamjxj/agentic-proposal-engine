@@ -1,15 +1,16 @@
 # Auto-Bidder Backend (Python AI Service)
 
-Python FastAPI service powering AI features: RAG knowledge base, proposal generation, and job scraping.
+Python FastAPI service powering AI features: RAG knowledge base, AI proposal generation, and job discovery.
 
 ## Tech Stack
 
 - **Framework**: FastAPI 0.104+
+- **Database**: PostgreSQL (asyncpg)
 - **Vector DB**: ChromaDB 0.4+
-- **RAG**: LangChain 0.1+
-- **LLM**: OpenAI GPT-4-turbo
-- **Embeddings**: OpenAI text-embedding-3-small
-- **Scraping**: Crawlee (Python)
+- **RAG**: LangChain 0.1+ with per-user collections
+- **LLM**: OpenAI GPT-4-turbo / DeepSeek
+- **Embeddings**: SentenceTransformer (all-MiniLM-L6-v2) or OpenAI
+- **Job Discovery**: HuggingFace datasets (USE_HF_DATASET=true); web scraping planned
 - **Document Processing**: pypdf, python-docx
 
 ## Quick Start
@@ -58,6 +59,13 @@ app/
 └── core/                # Core utilities
 ```
 
+## Key Endpoints
+
+- `GET /api/projects/list` – List jobs (from HuggingFace)
+- `POST /api/projects/discover` – Discover jobs by keywords
+- `POST /api/proposals/generate-from-job` – AI proposal generation
+- `GET /api/documents` – Knowledge base documents
+
 ## Development
 
-See [auto-bidder/docs/quickstart.md](../docs/quickstart.md) for detailed setup instructions.
+See [docs/1-getting-started/QUICKSTART.md](../docs/1-getting-started/QUICKSTART.md) for full setup. Requires Docker (PostgreSQL + ChromaDB), JWT_SECRET, and LLM API keys.

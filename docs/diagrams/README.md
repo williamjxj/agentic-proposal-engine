@@ -106,7 +106,7 @@ Links to related docs or implementation files.
 
 These diagrams are referenced from:
 - [Main README.md](../../README.md) - Architecture, workflow, auth flow sections
-- [Architecture Documentation](../2-architecture/) - Detailed system design
+- [Architecture Documentation](../2-architecture/ARCHITECTURE_DIAGRAM.md) - Detailed system design
 - [Getting Started Guide](../1-getting-started/QUICKSTART.md) - Setup instructions
 
 ## 🛠️ Maintenance

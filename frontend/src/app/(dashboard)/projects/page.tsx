@@ -17,7 +17,6 @@ import {
   listProjects,
   getProjectStats,
   getAvailableDatasets,
-  listKeywords,
   type Project,
   type ProjectStats,
   type DatasetInfo,
@@ -44,6 +43,11 @@ export default function ProjectsPage() {
   const [showDiscoverDialog, setShowDiscoverDialog] = useState(false)
   const [discoverKeywords, setDiscoverKeywords] = useState('')
   const [selectedDataset, setSelectedDataset] = useState('')
+  const [discoveryResult, setDiscoveryResult] = useState<{
+    count: number
+    dataset: string
+    keywords: string[]
+  } | null>(null)
 
   // Get saved filters from session state
   const savedFilters = getFilters<ProjectFilters>()
@@ -59,7 +63,7 @@ export default function ProjectsPage() {
   useEffect(() => {
     async function loadData() {
       setIsLoading(true)
-      
+
       try {
         await measureOperation('load-projects', async () => {
           const result = await listProjects(filters, 50, 0)
@@ -67,7 +71,7 @@ export default function ProjectsPage() {
             setProjects(result.jobs)
           }
         })
-        
+
         // Load stats
         const statsResult = await getProjectStats()
         if (statsResult) {
@@ -120,21 +124,9 @@ export default function ProjectsPage() {
     setFilters(filters)
   }, [filters, setFilters])
 
-  // T019/T020: Pre-fill discover keywords from user's saved keywords when opening dialog
-  useEffect(() => {
-    if (showDiscoverDialog && !discoverKeywords) {
-      listKeywords()
-        .then((keywords) => {
-          if (keywords?.length) {
-            setDiscoverKeywords(keywords.map((k) => k.keyword).join(', '))
-          }
-        })
-        .catch(() => {})
-    }
-  }, [showDiscoverDialog])
-
   const handleSearch = async () => {
     setIsLoading(true)
+    setDiscoveryResult(null) // Clear discovery result on manual search
     try {
       const result = await listProjects(filters, 50, 0)
       if (result) {
@@ -148,12 +140,14 @@ export default function ProjectsPage() {
   }
 
   const handleDiscoverJobs = async () => {
+    if (!discoverKeywords.trim()) {
+      alert('Please enter keywords to search')
+      return
+    }
+
     setIsDiscovering(true)
     try {
-      // Keywords from input, or empty (backend uses user's saved keywords when empty)
-      const keywords = discoverKeywords.trim()
-        ? discoverKeywords.split(',').map((k) => k.trim()).filter(Boolean)
-        : []
+      const keywords = discoverKeywords.split(',').map((k) => k.trim()).filter(Boolean)
       const result = await discoverProjects({
         keywords,
         max_results: 50,
@@ -162,9 +156,13 @@ export default function ProjectsPage() {
 
       if (result) {
         setProjects(result.jobs)
+        setDiscoveryResult({
+          count: result.jobs.length,
+          dataset: result.dataset_used,
+          keywords: keywords
+        })
         setShowDiscoverDialog(false)
         setDiscoverKeywords('')
-        alert(`Discovered ${result.count ?? result.total ?? result.jobs?.length ?? 0} jobs from ${result.dataset_id ?? result.dataset_used ?? 'dataset'}`)
       }
     } catch (error) {
       console.error('Failed to discover jobs:', error)
@@ -209,11 +207,17 @@ export default function ProjectsPage() {
       {/* Stats */}
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <StatsCard key="total-jobs" title="Total Jobs" value={stats.total_jobs || 0} />
+          <StatsCard
+            key="total-jobs"
+            title="Total Jobs"
+            value={stats.total_jobs || 0}
+            tip="Total number of relevant projects found across all sources"
+          />
           <StatsCard
             key="platforms"
             title="Platforms"
             value={stats.by_platform ? Object.keys(stats.by_platform).length : 0}
+            tip="Number of freelance platforms (Upwork, Freelancer, etc.) monitoring"
           />
           <StatsCard
             key="top-skill"
@@ -223,6 +227,7 @@ export default function ProjectsPage() {
                 ? Object.entries(stats.by_skill).sort((a, b) => b[1] - a[1])[0]?.[0]
                 : 'N/A'
             }
+            tip="The most in-demand skill based on current job descriptions"
           />
         </div>
       )}
@@ -245,35 +250,68 @@ export default function ProjectsPage() {
         </button>
       </div>
 
+      {/* Discovery Summary Alert */}
+      {discoveryResult && (
+        <div className="rounded-lg border border-green-200 bg-green-50 p-4 relative dark:border-green-900 dark:bg-green-950">
+          <button
+            onClick={() => setDiscoveryResult(null)}
+            className="absolute top-2 right-2 text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-200"
+          >
+            ✕
+          </button>
+          <div className="flex items-start gap-3">
+            <span className="text-xl">✨</span>
+            <div>
+              <p className="text-sm font-medium text-green-800 dark:text-green-200">
+                Discovery Complete
+              </p>
+              <p className="text-sm text-green-700 mt-1 dark:text-green-300">
+                Found <span className="font-bold">{discoveryResult.count}</span> jobs in{" "}
+                <span className="font-mono bg-green-100 px-1 rounded dark:bg-green-900">
+                  {discoveryResult.dataset}
+                </span>{" "}
+                using keywords:{" "}
+                {discoveryResult.keywords.map((k, i) => (
+                  <span
+                    key={i}
+                    className="inline-block bg-primary/10 text-primary px-2 py-0.5 rounded-md text-xs font-semibold mx-0.5"
+                  >
+                    {k}
+                  </span>
+                ))}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Projects List */}
-      <div className="grid gap-4">
+      <div className="grid gap-6">
         {projects.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-slate-300 p-12 text-center dark:border-slate-700">
-            <p className="text-muted-foreground mb-4">No projects found</p>
-            <p className="text-sm text-muted-foreground mb-4">
-              Click "Discover Jobs" to find opportunities from HuggingFace datasets
+          <div className="rounded-2xl border-2 border-dashed border-slate-200 p-16 text-center dark:border-slate-800">
+            <div className="mx-auto w-16 h-16 bg-slate-50 dark:bg-slate-900 rounded-full flex items-center justify-center text-3xl mb-4">
+              🔍
+            </div>
+            <p className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-2">No projects found</p>
+            <p className="text-muted-foreground max-w-sm mx-auto mb-8">
+              We couldn't find any opportunities matching your criteria. Try widening your search or discover new jobs from HuggingFace.
             </p>
             <button
               onClick={() => setShowDiscoverDialog(true)}
-              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+              className="rounded-xl bg-primary px-8 py-3 font-bold text-primary-foreground shadow-lg hover:shadow-xl hover:scale-105 transition-all"
             >
-              Discover Jobs
+              Discover New Jobs
             </button>
           </div>
         ) : (
-          projects.map((project, index) => {
-            const projectId =
-              project.id ??
-              (project as { external_id?: string }).external_id ??
-              `project-${index}`
-            return (
-              <ProjectCard
-                key={projectId}
-                project={project}
-                onClick={() => handleProjectClick(projectId)}
-              />
-            )
-          })
+          projects.map((project) => (
+            <ProjectCard
+              key={project.id}
+              project={project}
+              onClick={() => handleProjectClick(project.id)}
+              highlight={filters.search}
+            />
+          ))
         )}
       </div>
 
@@ -296,108 +334,157 @@ export default function ProjectsPage() {
 
 // Components
 
-function StatsCard({ title, value }: { title: string; value: string | number }) {
+// Helper Component for Highlighting Search Keys
+function HighlightText({ text, highlight }: { text: string; highlight: string }) {
+  if (!highlight.trim()) return <>{text}</>
+
+  const regex = new RegExp(`(${highlight})`, 'gi')
+  const parts = text.split(regex)
+
   return (
-    <div className="rounded-lg border border-slate-200 p-4 dark:border-slate-800">
-      <p className="text-sm text-muted-foreground">{title}</p>
-      <p className="text-2xl font-bold mt-1">{value}</p>
+    <>
+      {parts.map((part, i) =>
+        regex.test(part) ? (
+          <mark key={i} className="bg-yellow-200 dark:bg-yellow-900/50 text-inherit px-0.5 rounded">
+            {part}
+          </mark>
+        ) : (
+          part
+        )
+      )}
+    </>
+  )
+}
+
+// Stats Card with improved UI
+function StatsCard({ title, value, tip }: { title: string; value: string | number; tip?: string }) {
+  return (
+    <div className="group relative rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:border-primary/30 dark:border-slate-800 dark:bg-slate-900/50">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-sm font-medium text-muted-foreground">{title}</p>
+        {tip && (
+          <div className="cursor-help text-muted-foreground/40 hover:text-primary transition-colors">
+            <span className="text-xs">ⓘ</span>
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 invisible group-hover:visible w-56 p-3 bg-slate-900 text-white text-[11px] rounded-lg shadow-xl z-20 text-center backdrop-blur-sm bg-opacity-95 border border-slate-700">
+              {tip}
+              <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-slate-900"></div>
+            </div>
+          </div>
+        )}
+      </div>
+      <p className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+        {value}
+      </p>
     </div>
   )
 }
 
+// Enhanced Project Card
 function ProjectCard({
   project,
   onClick,
+  highlight,
 }: {
   project: Project
   onClick: () => void
+  highlight: string
 }) {
   const router = useRouter()
 
   const handleGenerateProposal = (e: React.MouseEvent) => {
-    e.stopPropagation() // Prevent card click
+    e.stopPropagation()
 
-    const projectId =
-      project.id ??
-      (project as { external_id?: string }).external_id ??
-      ''
     const params = new URLSearchParams({
-      jobId: projectId,
+      jobId: project.id,
       jobTitle: project.title,
       jobCompany: project.company,
       jobDescription: project.description,
       jobPlatform: project.platform,
     })
-    
+
     if (project.skills && project.skills.length > 0) {
       params.append('jobSkills', project.skills.join(','))
     }
-    
+
     if (project.budget) {
       params.append('jobBudget', `$${project.budget.min} - $${project.budget.max}`)
     }
-    
+
     router.push(`/proposals/new?${params.toString()}`)
   }
 
   return (
-    <div className="rounded-lg border border-slate-200 p-6 transition-all dark:border-slate-800 hover:shadow-md">
-      <div className="flex items-start justify-between">
+    <div
+      className="group relative rounded-xl border border-slate-200 bg-white p-6 transition-all duration-300 hover:shadow-lg hover:border-primary/20 dark:border-slate-800 dark:bg-slate-900/40"
+    >
+      <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
         <div className="flex-1 cursor-pointer" onClick={onClick}>
-          <h3 className="font-semibold text-lg">{project.title}</h3>
-          <p className="text-sm text-muted-foreground mt-1">{project.company}</p>
+          <div className="flex items-center gap-3">
+            <h3 className="font-bold text-xl text-slate-900 dark:text-slate-100 group-hover:text-primary transition-colors">
+              <HighlightText text={project.title} highlight={highlight} />
+            </h3>
+            <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
+              {project.platform}
+            </span>
+          </div>
+          <p className="text-sm font-medium text-slate-500 mt-1 flex items-center gap-1.5">
+            🏢 <HighlightText text={project.company} highlight={highlight} />
+          </p>
         </div>
-        <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-          {project.platform}
-        </span>
+
+        <div className="flex items-center gap-2">
+          {project.budget && (
+            <div className="text-right">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-tighter">Est. Budget</p>
+              <p className="text-lg font-bold text-green-600 dark:text-green-400">
+                ${project.budget.min.toLocaleString()} - ${project.budget.max.toLocaleString()}
+              </p>
+            </div>
+          )}
+        </div>
       </div>
 
-      <p className="mt-3 text-sm text-muted-foreground line-clamp-2 cursor-pointer" onClick={onClick}>
-        {project.description}
-      </p>
+      <div className="mt-4 cursor-pointer" onClick={onClick}>
+        <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed line-clamp-3">
+          <HighlightText text={project.description} highlight={highlight} />
+        </p>
+      </div>
 
-      {project.skills && project.skills.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {project.skills.slice(0, 5).map((skill, i) => (
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-wrap gap-2">
+          {project.skills?.slice(0, 4).map((skill, i) => (
             <span
               key={i}
-              className="rounded-md bg-slate-100 px-2 py-1 text-xs dark:bg-slate-800"
+              className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300"
             >
               {skill}
             </span>
           ))}
-          {project.skills.length > 5 && (
-            <span
-              key="more-skills"
-              className="rounded-md bg-slate-100 px-2 py-1 text-xs dark:bg-slate-800"
-            >
-              +{project.skills.length - 5} more
+          {project.skills && project.skills.length > 4 && (
+            <span className="text-xs text-muted-foreground self-center">
+              +{project.skills.length - 4} more
             </span>
           )}
         </div>
-      )}
 
-      <div className="mt-4 flex items-center justify-between">
-        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-          {project.location && <span>📍 {project.location}</span>}
-          {project.budget && (
-            <span>
-              💰 ${project.budget.min?.toLocaleString()} - $
-              {project.budget.max?.toLocaleString()}
-            </span>
-          )}
-          {project.posted_date && (
-            <span>🕒 {new Date(project.posted_date).toLocaleDateString()}</span>
-          )}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onClick}
+            className="text-sm font-semibold text-slate-400 hover:text-primary transition-colors pr-2"
+          >
+            View Details
+          </button>
+          <button
+            onClick={handleGenerateProposal}
+            className="relative overflow-hidden rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground transition-all hover:scale-[1.02] active:scale-95 shadow-sm hover:shadow-md"
+          >
+            Generate Proposal
+          </button>
         </div>
-        
-        <button
-          onClick={handleGenerateProposal}
-          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-        >
-          Generate Proposal
-        </button>
       </div>
+
+      {/* Subtle Bottom Border Interaction */}
+      <div className="absolute bottom-0 left-0 h-1 w-0 bg-primary/40 transition-all duration-500 group-hover:w-full rounded-b-xl" />
     </div>
   )
 }
@@ -425,7 +512,7 @@ function DiscoverDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="bg-white dark:bg-slate-900 rounded-lg p-6 max-w-md w-full mx-4">
         <h2 className="text-xl font-bold mb-4">Discover Jobs</h2>
-        
+
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-2">

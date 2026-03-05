@@ -146,8 +146,7 @@ flowchart LR
 
 - [README.md](README.md) – Stack, quick start, env vars  
 - [NEXT_STEPS.md](NEXT_STEPS.md) – Auth, storage, credentials, testing  
-- [docs/2-architecture/ARCHITECTURE_DIAGRAM.md](docs/2-architecture/ARCHITECTURE_DIAGRAM.md) – Job discovery, RAG, platform APIs  
-- [docs/2-architecture/MASTER_PLAN.md](docs/2-architecture/MASTER_PLAN.md) – Merge plan, platform_credentials, Upwork/Freelancer  
+- [docs/2-architecture/ARCHITECTURE_DIAGRAM.md](docs/2-architecture/ARCHITECTURE_DIAGRAM.md) – Job discovery, RAG, platform APIs
 - [docs/3-guides/PRODUCTION_DEPLOYMENT.md](docs/3-guides/PRODUCTION_DEPLOYMENT.md) – Deployment, JWT, monitoring  
 - [specs/002-ui-routers-improvement/research.md](specs/002-ui-routers-improvement/research.md) – Platform API verification  
 - [database/migrations/003_biddinghub_merge.sql](database/migrations/003_biddinghub_merge.sql) – `platform_credentials` schema

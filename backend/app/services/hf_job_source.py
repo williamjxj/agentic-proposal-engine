@@ -34,13 +34,18 @@ def normalize_hf_job(record: dict, source_dataset: str) -> dict:
     """
     
     # jacob-hugging-face/job-descriptions format
+    # Schema: company_name, job_description, position_title, description_length, model_response
     if source_dataset == "jacob-hugging-face/job-descriptions":
+        title = record.get("position_title") or record.get("job_title") or "Unknown Title"
         return {
+            "id": hashlib.md5(
+                f"{record.get('position_title', '')}{record.get('job_description', '')[:100]}".encode()
+            ).hexdigest(),
             "external_id": hashlib.md5(
                 record.get("job_description", "")[:80].encode()
             ).hexdigest(),
             "platform": "hf_dataset",
-            "title": record.get("job_title", "Unknown Title"),
+            "title": title,
             "company": record.get("company_name", "Unknown Company"),
             "description": record.get("job_description", ""),
             "requirements": record.get("job_requirements", ""),
@@ -60,13 +65,17 @@ def normalize_hf_job(record: dict, source_dataset: str) -> dict:
         skills = record.get("job_skills", [])
         if isinstance(skills, str):
             skills = [s.strip() for s in skills.split(",") if s.strip()]
-        
+
+        job_title = record.get("job_title_short") or record.get("job_title") or "Unknown Title"
         return {
+            "id": str(record.get("job_id", hashlib.md5(
+                f"{job_title}{record.get('company_name', '')}".encode()
+            ).hexdigest())),
             "external_id": str(record.get("job_id", hashlib.md5(
-                record.get("job_title", "")[:80].encode()
+                str(job_title)[:80].encode()
             ).hexdigest())),
             "platform": "hf_dataset",
-            "title": record.get("job_title_short", record.get("job_title", "")),
+            "title": job_title,
             "company": record.get("company_name", ""),
             "description": record.get("job_description", ""),
             "requirements": "",
@@ -84,6 +93,9 @@ def normalize_hf_job(record: dict, source_dataset: str) -> dict:
     # debasmitamukherjee/IT_job_postings format
     elif "IT_job_postings" in source_dataset or "it_job" in source_dataset.lower():
         return {
+            "id": hashlib.md5(
+                f"{record.get('Job Title', '')}{record.get('Company', '')}".encode()
+            ).hexdigest(),
             "external_id": hashlib.md5(
                 str(record.get("Job Title", ""))[:80].encode()
             ).hexdigest(),
@@ -106,12 +118,23 @@ def normalize_hf_job(record: dict, source_dataset: str) -> dict:
         }
     
     # Generic fallback: pass through with sensible defaults
+    # Try common column names across HF job datasets
+    title = (
+        record.get("title")
+        or record.get("job_title")
+        or record.get("position_title")
+        or record.get("Job Title")
+        or "Unknown Title"
+    )
     return {
+        "id": hashlib.md5(
+            f"{title}{record.get('company', '')}{record.get('description', '')[:50]}".encode()
+        ).hexdigest(),
         "external_id": hashlib.md5(
-            str(record.get("title", record.get("job_title", "")))[:80].encode()
+            str(title)[:80].encode()
         ).hexdigest(),
         "platform": "hf_dataset",
-        "title": record.get("title", record.get("job_title", "Unknown Title")),
+        "title": title,
         "company": record.get("company", record.get("company_name", "Company")),
         "description": record.get("description", record.get("job_description", "")),
         "requirements": record.get("requirements", record.get("job_requirements", "")),

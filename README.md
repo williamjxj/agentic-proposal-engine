@@ -34,7 +34,7 @@ An AI-powered auto-bidding platform that reduces proposal writing time from 30 m
 
 ## 🎯 Core Features
 
-- **Automated Job Discovery**: Scrape and collect relevant freelance jobs from multiple platforms
+- **Automated Job Discovery**: Discover jobs from HuggingFace datasets (Projects → Discover Jobs); web scraping planned for production
 - **Smart Knowledge Base**: Upload portfolio documents, case studies, and team profiles for AI context
 - **AI Proposal Generation**: Generate personalized, evidence-based proposals in under 60 seconds
 - **Bidding Strategies**: Create reusable AI prompt templates for different proposal styles
@@ -75,7 +75,7 @@ This is a **full-stack monorepo** with two main components:
 - **Vector DB**: ChromaDB for RAG
 - **RAG**: LangChain for document processing
 - **LLM**: OpenAI GPT-4-turbo / DeepSeek
-- **Scraping**: Playwright + BeautifulSoup for job discovery
+- **Job Discovery**: HuggingFace datasets (development); Playwright planned for production scraping
 
 ## 🚀 Quick Start
 
@@ -128,7 +128,7 @@ uvicorn app.main:app --reload --port 8000
 - `DEEPSEEK_API_KEY`: Your DeepSeek API key (or use OpenAI)
 - `CHROMA_PERSIST_DIR`: ChromaDB storage path (default: ./chroma_db)
 
-## � Security & Authentication
+## 🔐 Security & Authentication
 
 Auto Bidder uses **JWT-based authentication** with secure password hashing via bcrypt.
 
@@ -156,17 +156,18 @@ Add the generated secret to `backend/.env`:
 JWT_SECRET=<your-generated-secret-here>
 ```
 
-## �📚 Documentation
+## 📚 Documentation
 
-Comprehensive documentation is available in the [`docs/`](./docs/) directory:
+Comprehensive documentation is in [`docs/`](./docs/). See [docs/README.md](./docs/README.md) for the full index.
 
-- [**START_HERE.md**](./docs/START_HERE.md) - Project overview and getting started
-- [**implementation.md**](./docs/implementation.md) - 12-step implementation guide
-- [**ARCHITECTURE_DIAGRAM.md**](./docs/ARCHITECTURE_DIAGRAM.md) - Visual system architecture
-- [**METUP_AUTH.md**](./docs/SETUP_AUTH.md) - Quick start guide for authentication setup
-- [**AUTH_MIGRATION.md**](./docs/AUTH_MIGRATION.md) - Details on PostgreSQL + JWT authentication
-- [**ARCHITECTURE_DIAGRAM.md**](./docs/ARCHITECTURE_DIAGRAM.md) - Visual system architecture
-- [**QUICKSTART.md**](./docs/1-getting-started/QUICKSTART.md) - Getting started guide
+| Doc | Purpose |
+|-----|---------|
+| [**QUICKSTART**](./docs/1-getting-started/QUICKSTART.md) | Setup and run in 10 minutes |
+| [**SETUP_AUTH**](./docs/SETUP_AUTH.md) | JWT and authentication setup |
+| [**PROPOSAL_WORKFLOW_INTEGRATION**](./docs/PROPOSAL_WORKFLOW_INTEGRATION.md) | Discover Jobs → Generate Proposal flow |
+| [**HUGGINGFACE_INTEGRATION**](./docs/HUGGINGFACE_INTEGRATION.md) | Job discovery (HuggingFace datasets) |
+| [**SCRAPING_STATUS**](./docs/SCRAPING_STATUS.md) | Web scraping status (planned) |
+| [**diagrams/**](./docs/diagrams/) | Architecture, auth, workflow diagrams |
 ```
 auto-bidder/
 ├── frontend/              # Next.js 15 application
@@ -225,7 +226,7 @@ cd backend
 railway up
 ```
 
-See [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) for detailed deployment instructions.
+See [docs/3-guides/PRODUCTION_DEPLOYMENT.md](./docs/3-guides/PRODUCTION_DEPLOYMENT.md) for detailed deployment.
 
 ## 📊 Success Metrics
 
@@ -266,7 +267,7 @@ See [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) for detailed deployment instructi
 - PostgreSQL (docker-compose)
 - ChromaDB (docker-compose)
 - Vercel (frontend hosting)
-- Railway/Fly.io (backend hostingmd](./docs/CONTRIBUTING.md) for development workflow and coding standards.
+- Railway/Fly.io (backend hosting)
 
 ## 📄 License
 

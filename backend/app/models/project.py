@@ -76,8 +76,11 @@ class ProjectDiscoverResponse(BaseModel):
     success: bool = Field(..., description="Whether the operation was successful")
     source: str = Field(..., description="Data source used (huggingface, scraper, etc.)")
     dataset_id: Optional[str] = Field(None, description="HuggingFace dataset ID if applicable")
+    dataset_used: Optional[str] = Field(None, description="Alias for dataset_id")
     count: int = Field(..., description="Number of projects found")
+    total: Optional[int] = Field(None, description="Alias for count")
     jobs: List[dict] = Field(..., description="List of discovered jobs")
+    keywords_searched: Optional[List[str]] = Field(None, description="Keywords used for search")
 
 
 class ProjectStats(BaseModel):

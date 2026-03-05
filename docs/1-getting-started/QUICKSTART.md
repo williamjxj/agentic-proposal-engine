@@ -160,13 +160,15 @@ curl -X GET http://localhost:8000/api/auth/me \
 
 ---
 
-### 2. Auto-Save & Recovery
+## 📖 User Workflow (3 Steps)
 
-Start drafting a proposal. Wait 10 seconds for the "Saved" indicator. Reload the page to see the recovery prompt.
+Once setup is complete:
 
-### 3. Performance Analytics
+1. **Upload Knowledge Base** → Go to **Knowledge Base**, upload portfolio PDFs/DOCX. The AI uses these for RAG context.
+2. **Configure Strategy** → Go to **Strategies**, create or select a proposal tone (professional, casual, technical).
+3. **Generate Proposals** → Go to **Projects** → Discover Jobs (HuggingFace) → Click "Generate Proposal" on a job card → AI generates draft.
 
-Visit `/analytics` to see navigation timing metrics (target: <500ms).
+See [Proposal Workflow Integration](../PROPOSAL_WORKFLOW_INTEGRATION.md) for the complete flow.
 
 ---
 
@@ -178,4 +180,4 @@ Visit `/analytics` to see navigation timing metrics (target: <500ms).
 
 ---
 
-**Ready to Build?** Check [ARCHITECTURE_DIAGRAM.md](../2-architecture/ARCHITECTURE_DIAGRAM.md) for a deep dive into how the system works.
+**Ready to Build?** Check [diagrams/architecture-diagram.md](../diagrams/architecture-diagram.md) for system architecture.

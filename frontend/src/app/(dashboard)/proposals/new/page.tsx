@@ -11,7 +11,6 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAutoSave } from '@/hooks/useAutoSave'
-import { generateProposalFromJob } from '@/lib/api/client'
 import { useDraftRecovery } from '@/hooks/useDraftRecovery'
 import { AutoSaveIndicator, DraftRecoveryBanner } from '@/components/workflow/auto-save-indicator'
 import { LoadingSkeleton } from '@/components/workflow/progress-overlay'
@@ -45,10 +44,10 @@ export default function NewProposalPage() {
     skills: '',
   })
   const [isInitialized, setIsInitialized] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [jobContext, setJobContext] = useState<JobContext | null>(null)
   const [showJobContext, setShowJobContext] = useState(true)
-  const [isAIGenerating, setIsAIGenerating] = useState(false)
-  const [aiError, setAiError] = useState<string | null>(null)
 
   // Extract job data from query parameters
   useEffect(() => {
@@ -95,8 +94,27 @@ export default function NewProposalPage() {
     entityId: null, // null for new proposals
     onRecover: (recoveredDraft) => {
       // Restore form data from draft
-      if (recoveredDraft.draft_data) {
-        setFormData(recoveredDraft.draft_data as ProposalFormData)
+      const draftData = recoveredDraft.draftData
+      if (draftData) {
+        setFormData({
+          title: draftData.title || '',
+          description: draftData.description || '',
+          budget: draftData.budget || '',
+          timeline: draftData.timeline || '',
+          skills: draftData.skills || '',
+        })
+
+        if (draftData.jobId) {
+          setJobContext({
+            id: draftData.jobId,
+            title: draftData.jobTitle || '',
+            company: draftData.jobCompany || 'Unknown Company',
+            description: draftData.jobDescription || '',
+            platform: draftData.jobPlatform || 'Unknown',
+            skills: draftData.jobSkills,
+            budget: draftData.jobBudget,
+          })
+        }
       }
     },
     onDiscard: () => {
@@ -122,7 +140,16 @@ export default function NewProposalPage() {
   } = useAutoSave({
     entityType: 'proposal',
     entityId: null,
-    data: formData,
+    data: {
+      ...formData,
+      jobId: jobContext?.id,
+      jobTitle: jobContext?.title,
+      jobCompany: jobContext?.company,
+      jobDescription: jobContext?.description,
+      jobPlatform: jobContext?.platform,
+      jobSkills: jobContext?.skills,
+      jobBudget: jobContext?.budget,
+    },
     enabled: isInitialized && !showRecoveryPrompt,
     onSaveSuccess: (draft) => {
       console.log('Draft saved successfully:', draft)
@@ -148,6 +175,8 @@ export default function NewProposalPage() {
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsSubmitting(true)
+    setError(null)
 
     try {
       // Save current state first
@@ -159,50 +188,38 @@ export default function NewProposalPage() {
 
       // Navigate to proposals list
       router.push('/proposals')
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to submit proposal:', error)
-      // TODO: Show error message to user
+      setError(error.message || 'Failed to submit proposal. Please check if all required fields are filled correctly.')
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
-  // AI-assisted proposal generation (RAG + strategy)
+  // AI-assisted proposal generation
   const handleAIGenerate = async () => {
     if (!jobContext) {
-      setAiError('No job context available for AI generation')
+      alert('No job context available for AI generation')
       return
     }
 
-    setIsAIGenerating(true)
-    setAiError(null)
-
     try {
-      const generated = await generateProposalFromJob({
-        job_title: jobContext.title,
-        job_description: jobContext.description,
-        job_skills: jobContext.skills
-          ? jobContext.skills.split(',').map((s) => s.trim())
-          : undefined,
-      })
+      // TODO: Call backend API to generate proposal using RAG
 
-      if (generated) {
-        setFormData((prev) => ({
-          ...prev,
-          title: generated.title,
-          description: generated.description,
-          budget: generated.budget || prev.budget,
-          timeline: generated.timeline || prev.timeline,
-          skills: generated.skills?.join(', ') || prev.skills,
-        }))
-      }
+      // Placeholder: Pre-fill with AI-style content
+      setFormData((prev) => ({
+        ...prev,
+        description: prev.description +
+          `\n\nBased on the job requirements for "${jobContext.title}", ` +
+          `I am confident I can deliver exceptional results. My expertise in ${jobContext.skills || 'relevant technologies'} ` +
+          `aligns perfectly with your needs.\n\n` +
+          `I have successfully completed similar projects for ${jobContext.company} ` +
+          `and understand the challenges in this domain. ` +
+          `I can provide a detailed project plan and timeline upon request.`,
+      }))
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Failed to generate proposal'
-      setAiError(message)
-      if (message.includes('429') || message.includes('wait')) {
-        setAiError('Another proposal is being generated. Please wait and try again.')
-      }
-    } finally {
-      setIsAIGenerating(false)
+      console.error('Failed to generate AI proposal:', error)
+      alert('Failed to generate proposal. Please try again.')
     }
   }
 
@@ -220,7 +237,7 @@ export default function NewProposalPage() {
       {/* Header with Auto-Save Indicator */}
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">New Proposal</h1>
-        
+
         <AutoSaveIndicator
           status={saveStatus}
           lastSaved={lastSaved}
@@ -229,6 +246,14 @@ export default function NewProposalPage() {
           onManualSave={saveNow}
         />
       </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
+          <p className="font-medium">Error submitting proposal</p>
+          <p className="mt-1">{error}</p>
+        </div>
+      )}
 
       {/* Draft Recovery Banner */}
       {showRecoveryPrompt && (
@@ -257,7 +282,7 @@ export default function NewProposalPage() {
               ✕
             </button>
           </div>
-          
+
           <div className="space-y-2 text-sm">
             <div>
               <span className="font-medium text-blue-900 dark:text-blue-100">
@@ -270,13 +295,13 @@ export default function NewProposalPage() {
                 • {jobContext.platform}
               </span>
             </div>
-            
+
             {jobContext.description && (
               <p className="text-blue-800 dark:text-blue-200 line-clamp-2">
                 {jobContext.description}
               </p>
             )}
-            
+
             <div className="flex gap-4 text-blue-700 dark:text-blue-300">
               {jobContext.budget && (
                 <span>💰 Budget: {jobContext.budget}</span>
@@ -286,7 +311,7 @@ export default function NewProposalPage() {
               )}
             </div>
           </div>
-          
+
           <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-900">
             <p className="text-xs text-blue-700 dark:text-blue-300">
               💡 Tip: Your proposal will be tailored to this job using AI and your knowledge base
@@ -323,22 +348,12 @@ export default function NewProposalPage() {
               <button
                 type="button"
                 onClick={handleAIGenerate}
-                disabled={isAIGenerating}
-                className="text-sm text-primary hover:underline flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="text-sm text-primary hover:underline flex items-center gap-1"
               >
-                {isAIGenerating ? (
-                  <>⏳ Generating...</>
-                ) : (
-                  <>✨ AI Generate</>
-                )}
+                ✨ AI Generate
               </button>
             )}
           </div>
-          {aiError && (
-            <p className="text-sm text-destructive mb-2" role="alert">
-              {aiError}
-            </p>
-          )}
           <textarea
             id="description"
             value={formData.description}
@@ -405,10 +420,10 @@ export default function NewProposalPage() {
         <div className="flex items-center gap-4 pt-4 border-t">
           <button
             type="submit"
-            disabled={saveStatus === 'saving'}
+            disabled={isSubmitting || saveStatus === 'saving'}
             className="px-6 py-2 rounded-md bg-primary text-primary-foreground font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Submit Proposal
+            {isSubmitting ? 'Submitting...' : 'Submit Proposal'}
           </button>
 
           <button

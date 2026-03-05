@@ -476,11 +476,12 @@ The service handles multiple dataset formats with intelligent field mapping:
 ```python
 def normalize_hf_job(job_data: dict, dataset_id: str) -> dict:
     # jacob-hugging-face/job-descriptions format
+    # Schema: company_name, job_description, position_title, description_length, model_response
     if dataset_id == "jacob-hugging-face/job-descriptions":
         return {
             "external_id": hashlib.md5(...).hexdigest(),
             "platform": "hf_dataset",
-            "title": record.get("job_title", "Unknown Title"),
+            "title": record.get("position_title") or record.get("job_title", "Unknown Title"),
             "company": record.get("company_name", "Unknown Company"),
             "description": record.get("job_description", ""),
             "requirements": record.get("job_requirements", ""),
@@ -499,7 +500,7 @@ def normalize_hf_job(job_data: dict, dataset_id: str) -> dict:
         return {
             "external_id": str(record.get("job_id", "")),
             "platform": "hf_dataset",
-            "title": record.get("job_title_short", ""),
+            "title": record.get("job_title_short") or record.get("job_title", "Unknown Title"),
             "company": record.get("company_name", ""),
             "description": record.get("job_description", ""),
             "skills": record.get("job_skills", []) or [],
@@ -625,11 +626,16 @@ pip install -r requirements.txt
 - Try alternative dataset
 - Search for datasets: https://huggingface.co/datasets?search=job
 
-### Missing Fields in Result
+### Missing Fields / Unknown Title
 
-**Error:** `KeyError: 'job_title'`
+**Error:** `KeyError: 'job_title'` or jobs show "Unknown Title"
 
-**Solution:** Inspect dataset structure and update `normalize_hf_job()`:
+**Cause:** Different datasets use different column names. Examples:
+- `jacob-hugging-face/job-descriptions`: `position_title` (not job_title)
+- `lukebarousse/data_jobs`: `job_title`, `job_title_short`
+- `debasmitamukherjee/IT_job_postings`: `Job Title`
+
+**Solution:** Inspect dataset structure and ensure `normalize_hf_job()` checks the right fields:
 ```python
 from datasets import load_dataset
 ds = load_dataset("dataset-name", split="train", streaming=True)

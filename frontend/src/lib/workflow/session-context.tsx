@@ -56,7 +56,8 @@ export function WorkflowProvider({ children }: { children: React.ReactNode }) {
   }, [sessionState])
 
   /**
-   * Sync session state with server (re-enabled after URL construction fix)
+   * Sync session state with server
+   * TEMPORARILY DISABLED to prevent infinite loop
    */
   const syncWithServer = useCallback(async (force = false) => {
     const currentState = stateRef.current
@@ -136,6 +137,7 @@ export function WorkflowProvider({ children }: { children: React.ReactNode }) {
       setSessionState(newState)
       LocalStorage.set(SESSION_STORAGE_KEY, newState)
 
+      // TEMPORARILY DISABLED - API calls causing infinite loop
       // Sync with server if online (debounced)
       if (isOnline) {
         try {

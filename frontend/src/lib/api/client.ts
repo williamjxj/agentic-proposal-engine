@@ -191,8 +191,7 @@ import type {
 
 /**
  * Get backend API URL from environment
- * Returns a properly formatted absolute URL.
- * Prevents malformed URLs (e.g. /apihttp:/localhost) that cause infinite loops.
+ * Returns a properly formatted absolute URL
  */
 function getBackendUrl(): string {
   const url = process.env.NEXT_PUBLIC_BACKEND_API_URL || 'http://localhost:8000'
@@ -200,14 +199,9 @@ function getBackendUrl(): string {
   // Normalize: remove trailing slashes and trim
   let cleanUrl = url.trim().replace(/\/+$/, '')
 
-  // Ensure protocol - must start with http:// or https://
+  // Ensure protocol
   if (!/^https?:\/\//i.test(cleanUrl)) {
-    cleanUrl = `http://${cleanUrl.replace(/^\/+/, '').replace(/^api\/?/, '')}`
-  }
-
-  // Reject malformed patterns (e.g. apihttp:/, /apihttp:)
-  if (/\/?apihttps?:/i.test(cleanUrl) || cleanUrl.includes('apihttp')) {
-    return 'http://localhost:8000'
+    cleanUrl = `http://${cleanUrl.replace(/^\/+/, '')}`
   }
 
   return cleanUrl
@@ -377,7 +371,7 @@ export async function listKeywords(
   if (filters?.search) params.append('search', filters.search)
   if (filters?.is_active !== undefined) params.append('is_active', String(filters.is_active))
   if (filters?.match_type) params.append('match_type', filters.match_type)
-  
+
   const query = params.toString()
   const url = query ? `${backend}/api/keywords?${query}` : `${backend}/api/keywords`
   const { data } = await apiClient.get<{ keywords: Keyword[] }>(url)
@@ -487,7 +481,7 @@ export async function listDocuments(
   if (filters?.collection) params.append('collection', filters.collection)
   if (filters?.processing_status) params.append('status', filters.processing_status)
   if (filters?.search) params.append('search', filters.search)
-  
+
   const query = params.toString()
   const url = query ? `${backend}/api/documents?${query}` : `${backend}/api/documents`
   const { data } = await apiClient.get<Document[]>(url)
@@ -509,7 +503,7 @@ export async function uploadDocument(
   const backend = getBackendUrl()
   const formData = new FormData()
   formData.append('file', file)
-  
+
   const queryParams = new URLSearchParams({ collection })
   const { data } = await apiClient.post<Document>(
     `${backend}/api/documents/upload?${queryParams.toString()}`,
@@ -608,7 +602,7 @@ export async function listProposals(
   if (status) params.append('status', status)
   if (limit) params.append('limit', limit.toString())
   if (offset) params.append('offset', offset.toString())
-  
+
   const url = `${backend}/api/proposals${params.toString() ? '?' + params.toString() : ''}`
   const { data } = await apiClient.get<{ proposals: any[]; total: number }>(url)
   return data || { proposals: [], total: 0 }
@@ -623,39 +617,6 @@ export async function getProposal(proposalId: string): Promise<any | null> {
 export async function createProposal(proposalData: any): Promise<any | null> {
   const backend = getBackendUrl()
   const { data } = await apiClient.post<any>(`${backend}/api/proposals`, proposalData)
-  return data
-}
-
-export interface ProposalGenerateRequest {
-  job_id?: string
-  job_title: string
-  job_description: string
-  job_skills?: string[]
-  strategy_id?: string
-  extra_context?: string
-  custom_instructions?: string
-}
-
-export interface GeneratedProposal {
-  title: string
-  description: string
-  budget?: string
-  timeline?: string
-  skills?: string[]
-  ai_model?: string
-  strategy_id?: string
-  confidence_score?: number
-}
-
-export async function generateProposalFromJob(
-  request: ProposalGenerateRequest
-): Promise<GeneratedProposal | null> {
-  const backend = getBackendUrl()
-  const { data, error } = await apiClient.post<GeneratedProposal>(
-    `${backend}/api/proposals/generate-from-job`,
-    request
-  )
-  if (error) throw new Error(error)
   return data
 }
 
@@ -774,7 +735,7 @@ export async function listProjects(
 ): Promise<{ jobs: Project[]; total: number } | null> {
   const backend = getBackendUrl()
   const params = new URLSearchParams()
-  
+
   if (filters?.search) params.append('search', filters.search)
   if (filters?.skills) params.append('skills', filters.skills.join(','))
   if (filters?.min_budget) params.append('min_budget', filters.min_budget.toString())
@@ -782,7 +743,7 @@ export async function listProjects(
   if (filters?.platforms) params.append('platforms', filters.platforms.join(','))
   params.append('limit', limit.toString())
   params.append('offset', offset.toString())
-  
+
   const url = `${backend}/api/projects/list${params.toString() ? '?' + params.toString() : ''}`
   const { data } = await apiClient.get<{ jobs: Project[]; total: number }>(url)
   return data
@@ -800,10 +761,12 @@ export async function getProjectStats(): Promise<ProjectStats | null> {
 /**
  * Get available HuggingFace datasets
  */
-export async function getAvailableDatasets(): Promise<DatasetInfo[] | null> {
+export async function getAvailableDatasets(): Promise<DatasetInfo[]> {
   const backend = getBackendUrl()
-  const { data } = await apiClient.get<DatasetInfo[]>(`${backend}/api/projects/datasets`)
-  return data
+  // The backend returns { "datasets": [...], "current": "...", "mode": "..." }
+  // We extract the datasets array to prevent .map() errors in the UI.
+  const { data } = await apiClient.get<{ datasets: DatasetInfo[] }>(`${backend}/api/projects/datasets`)
+  return data?.datasets || []
 }
 
 /**

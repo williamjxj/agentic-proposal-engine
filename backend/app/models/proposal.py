@@ -16,7 +16,7 @@ class ProposalBase(BaseModel):
     
     title: str = Field(..., min_length=1, max_length=500, description="Proposal title")
     description: str = Field(..., min_length=1, description="Proposal description/content")
-    budget: Optional[Decimal] = Field(None, description="Proposed budget in USD")
+    budget: Optional[str] = Field(None, description="Proposed budget (string to allow ranges/context)")
     timeline: Optional[str] = Field(None, max_length=200, description="Timeline estimate")
     skills: List[str] = Field(default_factory=list, description="Required skills")
     
@@ -42,7 +42,7 @@ class ProposalUpdate(BaseModel):
     
     title: Optional[str] = Field(None, min_length=1, max_length=500)
     description: Optional[str] = Field(None, min_length=1)
-    budget: Optional[Decimal] = None
+    budget: Optional[str] = None
     timeline: Optional[str] = Field(None, max_length=200)
     skills: Optional[List[str]] = None
     job_url: Optional[str] = None
@@ -95,7 +95,7 @@ class ProposalSubmitRequest(BaseModel):
     # Optional overrides
     title: Optional[str] = None
     description: Optional[str] = None
-    budget: Optional[Decimal] = None
+    budget: Optional[str] = None
     timeline: Optional[str] = None
     skills: Optional[List[str]] = None
     

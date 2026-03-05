@@ -2,6 +2,7 @@
 import json
 from typing import List, Optional
 from uuid import UUID
+from datetime import datetime
 
 from app.core.database import get_db_pool
 from app.models.proposal import (
@@ -20,17 +21,18 @@ def _row_to_proposal(row: dict) -> Proposal:
         description=row["description"],
         budget=row["budget"],
         timeline=row["timeline"],
-        skills=row["skills"],
+        skills=row["skills"] if row["skills"] else [],
         job_url=row["job_url"],
-        job_title=row["job_title"],
+        job_platform=row["job_platform"],
         client_name=row["client_name"],
-        ai_analysis=row["ai_analysis"],
-        strategy_used=str(row["strategy_used"]) if row["strategy_used"] else None,
-        keywords_used=row["keywords_used"],
+        strategy_id=str(row["strategy_id"]) if row["strategy_id"] else None,
+        generated_with_ai=row["generated_with_ai"],
+        ai_model_used=row["ai_model_used"],
         status=row["status"],
         submitted_at=row["submitted_at"],
-        response_received_at=row["response_received_at"],
-        client_response=row["client_response"],
+        response_at=row["response_at"],
+        view_count=row["view_count"],
+        revision_count=row["revision_count"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
     )
@@ -52,10 +54,10 @@ async def list_proposals(
     params = [user_id]
     
     if status:
-        query += " AND status = $2"
+        query += f" AND status = ${len(params) + 1}"
         params.append(status)
     
-    query += " ORDER BY created_at DESC LIMIT $" + str(len(params) + 1) + " OFFSET $" + str(len(params) + 2)
+    query += f" ORDER BY created_at DESC LIMIT ${len(params) + 1} OFFSET ${len(params) + 2}"
     params.extend([limit, offset])
     
     rows = await db.fetch(query, *params)
@@ -89,8 +91,8 @@ async def create_proposal(
         """
         INSERT INTO proposals (
             user_id, title, description, budget, timeline, skills,
-            job_url, job_title, client_name, ai_analysis,
-            strategy_used, keywords_used, status
+            job_url, job_platform, client_name, strategy_id,
+            generated_with_ai, ai_model_used, status
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
         RETURNING *
@@ -102,11 +104,11 @@ async def create_proposal(
         proposal_data.timeline,
         proposal_data.skills,
         proposal_data.job_url,
-        proposal_data.job_title,
+        proposal_data.job_platform,
         proposal_data.client_name,
-        json.dumps(proposal_data.ai_analysis) if proposal_data.ai_analysis else None,
-        proposal_data.strategy_used,
-        proposal_data.keywords_used,
+        UUID(proposal_data.strategy_id) if proposal_data.strategy_id else None,
+        proposal_data.generated_with_ai,
+        proposal_data.ai_model_used,
         proposal_data.status or "draft",
     )
     
@@ -156,9 +158,9 @@ async def update_proposal(
         params.append(proposal_data.job_url)
         param_idx += 1
     
-    if proposal_data.job_title is not None:
-        update_fields.append(f"job_title = ${param_idx}")
-        params.append(proposal_data.job_title)
+    if proposal_data.job_platform is not None:
+        update_fields.append(f"job_platform = ${param_idx}")
+        params.append(proposal_data.job_platform)
         param_idx += 1
     
     if proposal_data.client_name is not None:
@@ -166,39 +168,14 @@ async def update_proposal(
         params.append(proposal_data.client_name)
         param_idx += 1
     
-    if proposal_data.ai_analysis is not None:
-        update_fields.append(f"ai_analysis = ${param_idx}")
-        params.append(json.dumps(proposal_data.ai_analysis))
-        param_idx += 1
-    
-    if proposal_data.strategy_used is not None:
-        update_fields.append(f"strategy_used = ${param_idx}")
-        params.append(proposal_data.strategy_used)
-        param_idx += 1
-    
-    if proposal_data.keywords_used is not None:
-        update_fields.append(f"keywords_used = ${param_idx}")
-        params.append(proposal_data.keywords_used)
+    if proposal_data.strategy_id is not None:
+        update_fields.append(f"strategy_id = ${param_idx}")
+        params.append(UUID(proposal_data.strategy_id) if proposal_data.strategy_id else None)
         param_idx += 1
     
     if proposal_data.status is not None:
         update_fields.append(f"status = ${param_idx}")
         params.append(proposal_data.status)
-        param_idx += 1
-    
-    if proposal_data.submitted_at is not None:
-        update_fields.append(f"submitted_at = ${param_idx}")
-        params.append(proposal_data.submitted_at)
-        param_idx += 1
-    
-    if proposal_data.response_received_at is not None:
-        update_fields.append(f"response_received_at = ${param_idx}")
-        params.append(proposal_data.response_received_at)
-        param_idx += 1
-    
-    if proposal_data.client_response is not None:
-        update_fields.append(f"client_response = ${param_idx}")
-        params.append(proposal_data.client_response)
         param_idx += 1
     
     if not update_fields:
@@ -258,15 +235,20 @@ async def submit_from_draft(
             entity_type,
         )
     else:
-        draft_row = await db.fetchrow(
-            """
-            SELECT * FROM draft_work 
-            WHERE user_id = $1 AND entity_type = $2 AND entity_id = $3
-            """,
-            user_id,
-            entity_type,
-            UUID(entity_id),
-        )
+        # Check if entity_id is a valid UUID before searching
+        try:
+            target_id = UUID(entity_id)
+            draft_row = await db.fetchrow(
+                """
+                SELECT * FROM draft_work 
+                WHERE user_id = $1 AND entity_type = $2 AND entity_id = $3
+                """,
+                user_id,
+                entity_type,
+                target_id,
+            )
+        except ValueError:
+            return None
     
     if not draft_row:
         return None
@@ -276,6 +258,13 @@ async def submit_from_draft(
     if isinstance(draft_data, str):
         draft_data = json.loads(draft_data)
     
+    # Extract skills
+    raw_skills = draft_data.get("skills", [])
+    if isinstance(raw_skills, str):
+        skills = [s.strip() for s in raw_skills.split(",") if s.strip()]
+    else:
+        skills = raw_skills if isinstance(raw_skills, list) else []
+
     # Create proposal from draft
     proposal = await create_proposal(
         user_id=user_id,
@@ -284,13 +273,13 @@ async def submit_from_draft(
             description=draft_data.get("description", ""),
             budget=draft_data.get("budget"),
             timeline=draft_data.get("timeline"),
-            skills=draft_data.get("skills", []),
-            job_url=draft_data.get("job_url"),
-            job_title=draft_data.get("job_title"),
-            client_name=draft_data.get("client_name"),
-            ai_analysis=draft_data.get("ai_analysis"),
-            strategy_used=UUID(draft_data["strategy_used"]) if draft_data.get("strategy_used") else None,
-            keywords_used=draft_data.get("keywords_used", []),
+            skills=skills,
+            job_url=draft_data.get("job_url") or draft_data.get("jobUrl"),
+            job_platform=draft_data.get("job_platform") or draft_data.get("jobPlatform"),
+            client_name=draft_data.get("client_name") or draft_data.get("jobCompany"),
+            strategy_id=draft_data.get("strategy_id") or draft_data.get("strategy_used") or draft_data.get("strategyId"),
+            generated_with_ai=draft_data.get("generated_with_ai") or draft_data.get("generatedWithAi") or False,
+            ai_model_used=draft_data.get("ai_model_used") or draft_data.get("aiModelUsed"),
             status="submitted",
         ),
     )
