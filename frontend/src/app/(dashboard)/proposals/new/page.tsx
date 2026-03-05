@@ -8,13 +8,25 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAutoSave } from '@/hooks/useAutoSave'
 import { useDraftRecovery } from '@/hooks/useDraftRecovery'
 import { AutoSaveIndicator, DraftRecoveryBanner } from '@/components/workflow/auto-save-indicator'
 import { LoadingSkeleton } from '@/components/workflow/progress-overlay'
+import { PageHeader } from '@/components/shared/page-header'
+import { PageContainer } from '@/components/shared/page-container'
+import { Breadcrumb } from '@/components/shared/breadcrumb'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { cn } from '@/lib/utils'
+import { Loader2 } from 'lucide-react'
 import { generateProposalFromJob, listStrategies } from '@/lib/api/client'
+import { useToast } from '@/lib/toast/toast-context'
 
 interface ProposalFormData {
   title: string
@@ -34,9 +46,10 @@ interface JobContext {
   budget?: string
 }
 
-export default function NewProposalPage() {
+function NewProposalPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const toast = useToast()
   const [formData, setFormData] = useState<ProposalFormData>({
     title: '',
     description: '',
@@ -190,25 +203,45 @@ export default function NewProposalPage() {
     }))
   }
 
-  // Handle form submission
+  // Handle form submission - create proposal directly from form data (no draft dependency)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
     setError(null)
 
     try {
-      // Save current state first
-      await saveNow()
+      const { createProposal, discardDraft } = await import('@/lib/api/client')
 
-      // Submit proposal from draft
-      const { submitProposalFromDraft } = await import('@/lib/api/client')
-      await submitProposalFromDraft('proposal', 'new')
+      const skillsArr = formData.skills
+        ? formData.skills.split(',').map((s) => s.trim()).filter(Boolean)
+        : []
 
-      // Navigate to proposals list
+      await createProposal({
+        title: formData.title.trim(),
+        description: formData.description.trim(),
+        budget: formData.budget?.trim() || undefined,
+        timeline: formData.timeline?.trim() || undefined,
+        skills: skillsArr,
+        job_platform: jobContext?.platform,
+        client_name: jobContext?.company,
+        strategy_id: selectedStrategyId || undefined,
+        generated_with_ai: false,
+        status: 'submitted',
+      })
+
+      // Clear draft so it doesn't appear in recovery
+      discardDraft('proposal', 'new').catch(() => {})
+
+      toast.success('Proposal submitted successfully!')
       router.push('/proposals')
-    } catch (error: any) {
-      console.error('Failed to submit proposal:', error)
-      setError(error.message || 'Failed to submit proposal. Please check if all required fields are filled correctly.')
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Failed to submit proposal. Please check if all required fields are filled correctly.'
+      console.error('Failed to submit proposal:', err)
+      setError(message)
+      toast.error(err)
     } finally {
       setIsSubmitting(false)
     }
@@ -245,10 +278,11 @@ export default function NewProposalPage() {
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to generate proposal'
-      setAiError(message)
-      if (message.includes('429') || message.includes('wait')) {
-        setAiError('Another proposal is being generated. Please wait and try again.')
-      }
+      const displayMsg = message.includes('429') || message.includes('wait')
+        ? 'Another proposal is being generated. Please wait and try again.'
+        : message
+      setAiError(displayMsg)
+      toast.error(err)
     } finally {
       setIsAIGenerating(false)
     }
@@ -256,19 +290,33 @@ export default function NewProposalPage() {
 
   if (!isInitialized) {
     return (
-      <div className="space-y-4">
-        <h1 className="text-3xl font-bold">New Proposal</h1>
+      <PageContainer>
+        <PageHeader title="New Proposal" />
         <LoadingSkeleton lines={5} />
-      </div>
+      </PageContainer>
     )
   }
 
-  return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      {/* Header with Auto-Save Indicator */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">New Proposal</h1>
+  const steps = jobContext
+    ? [
+        { id: 1, label: 'Job Reference', done: true },
+        { id: 2, label: 'Proposal Details', done: false },
+        { id: 3, label: 'Submit', done: false },
+      ]
+    : [
+        { id: 1, label: 'Proposal Details', done: false },
+        { id: 2, label: 'Submit', done: false },
+      ]
 
+  return (
+    <PageContainer className="max-w-4xl mx-auto space-y-6">
+      <Breadcrumb
+        items={[
+          { label: 'Proposals', href: '/proposals' },
+          { label: 'New Proposal' },
+        ]}
+      />
+      <PageHeader title="New Proposal">
         <AutoSaveIndicator
           status={saveStatus}
           lastSaved={lastSaved}
@@ -276,6 +324,28 @@ export default function NewProposalPage() {
           hasUnsavedChanges={hasUnsavedChanges}
           onManualSave={saveNow}
         />
+      </PageHeader>
+
+      {/* Step indicators */}
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        {steps.map((step, i) => (
+          <span key={step.id} className="flex items-center gap-2">
+            <span
+              className={cn(
+                'flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium',
+                step.done
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground'
+              )}
+            >
+              {step.done ? '✓' : step.id}
+            </span>
+            <span>{step.label}</span>
+            {i < steps.length - 1 && (
+              <span className="text-muted-foreground/60">→</span>
+            )}
+          </span>
+        ))}
       </div>
 
       {/* Error Message */}
@@ -297,22 +367,27 @@ export default function NewProposalPage() {
 
       {/* Job Context Card */}
       {jobContext && showJobContext && (
-        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950">
-          <div className="flex items-start justify-between mb-3">
+        <Card className="shine-border border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950">
+          <CardHeader className="pb-3">
+          <div className="flex items-start justify-between">
             <div className="flex items-center gap-2">
               <span className="text-lg">💼</span>
               <h3 className="font-semibold text-blue-900 dark:text-blue-100">
                 Job Reference
               </h3>
             </div>
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setShowJobContext(false)}
-              className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200"
+              className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200 h-8 w-8"
               title="Hide job context"
             >
               ✕
-            </button>
+            </Button>
           </div>
+        </CardHeader>
+        <CardContent className="pt-0 space-y-2">
 
           <div className="space-y-2 text-sm">
             <div>
@@ -349,72 +424,81 @@ export default function NewProposalPage() {
             </p>
             {strategies.length > 0 && (
               <div className="flex items-center gap-2 flex-wrap">
-                <label className="text-xs font-medium text-blue-800 dark:text-blue-200">Strategy:</label>
-                <select
+                <Label className="text-xs font-medium text-blue-800 dark:text-blue-200">Strategy:</Label>
+                <Select
                   value={selectedStrategyId || ''}
-                  onChange={(e) => setSelectedStrategyId(e.target.value || null)}
-                  className="text-xs rounded border border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-800 px-2 py-1 text-blue-900 dark:text-blue-100"
+                  onValueChange={(v) => setSelectedStrategyId(v || null)}
                 >
-                  {strategies.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}{s.is_default ? ' (default)' : ''}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-[180px] h-8 text-xs border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-800 text-blue-900 dark:text-blue-100">
+                    <SelectValue placeholder="Select strategy" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {strategies.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.name}{s.is_default ? ' (default)' : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             )}
           </div>
-        </div>
+        </CardContent>
+        </Card>
       )}
 
       {/* Proposal Form */}
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Title */}
         <div>
-          <label htmlFor="title" className="block text-sm font-medium mb-2">
-            Proposal Title *
-          </label>
-          <input
+          <Label htmlFor="title">Proposal Title *</Label>
+          <Input
             type="text"
             id="title"
             value={formData.title}
             onChange={(e) => handleChange('title', e.target.value)}
             required
             placeholder="Enter a compelling title for your proposal"
-            className="w-full rounded-md border border-slate-300 px-4 py-2 dark:border-slate-700 dark:bg-slate-900"
+            className="mt-2"
           />
         </div>
 
         {/* Description */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <label htmlFor="description" className="block text-sm font-medium">
-              Description *
-            </label>
+            <Label htmlFor="description">Description *</Label>
             {jobContext && (
-              <button
+              <Button
                 type="button"
+                variant="link"
+                className="h-auto p-0 text-sm gap-1.5"
                 onClick={handleAIGenerate}
                 disabled={isAIGenerating}
-                className="text-sm text-primary hover:underline flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isAIGenerating ? '⏳ Generating...' : '✨ AI Generate'}
-              </button>
+                {isAIGenerating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+                    Generating...
+                  </>
+                ) : (
+                  <>✨ AI Generate</>
+                )}
+              </Button>
             )}
           </div>
           {aiError && (
-            <p className="text-sm text-red-600 dark:text-red-400 mb-2" role="alert">
+            <p className="text-sm text-destructive mb-2" role="alert">
               {aiError}
             </p>
           )}
-          <textarea
+          <Textarea
             id="description"
             value={formData.description}
             onChange={(e) => handleChange('description', e.target.value)}
             required
             rows={8}
             placeholder="Describe your approach, methodology, and what makes your proposal unique"
-            className="w-full rounded-md border border-slate-300 px-4 py-2 dark:border-slate-700 dark:bg-slate-900"
+            className="mt-2"
           />
           <p className="text-xs text-muted-foreground mt-1">
             Minimum 100 characters (currently: {formData.description.length})
@@ -424,68 +508,67 @@ export default function NewProposalPage() {
         {/* Budget & Timeline */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label htmlFor="budget" className="block text-sm font-medium mb-2">
-              Budget *
-            </label>
-            <input
+            <Label htmlFor="budget">Budget *</Label>
+            <Input
               type="text"
               id="budget"
               value={formData.budget}
               onChange={(e) => handleChange('budget', e.target.value)}
               required
               placeholder="e.g., $5,000 - $10,000"
-              className="w-full rounded-md border border-slate-300 px-4 py-2 dark:border-slate-700 dark:bg-slate-900"
+              className="mt-2"
             />
           </div>
-
           <div>
-            <label htmlFor="timeline" className="block text-sm font-medium mb-2">
-              Timeline *
-            </label>
-            <input
+            <Label htmlFor="timeline">Timeline *</Label>
+            <Input
               type="text"
               id="timeline"
               value={formData.timeline}
               onChange={(e) => handleChange('timeline', e.target.value)}
               required
               placeholder="e.g., 4-6 weeks"
-              className="w-full rounded-md border border-slate-300 px-4 py-2 dark:border-slate-700 dark:bg-slate-900"
+              className="mt-2"
             />
           </div>
         </div>
 
         {/* Skills */}
         <div>
-          <label htmlFor="skills" className="block text-sm font-medium mb-2">
-            Required Skills
-          </label>
-          <input
+          <Label htmlFor="skills">Required Skills</Label>
+          <Input
             type="text"
             id="skills"
             value={formData.skills}
             onChange={(e) => handleChange('skills', e.target.value)}
             placeholder="e.g., React, TypeScript, Node.js (comma-separated)"
-            className="w-full rounded-md border border-slate-300 px-4 py-2 dark:border-slate-700 dark:bg-slate-900"
+            className="mt-2"
           />
         </div>
 
         {/* Actions */}
         <div className="flex items-center gap-4 pt-4 border-t">
-          <button
+          <Button
             type="submit"
-            disabled={isSubmitting || saveStatus === 'saving'}
-            className="px-6 py-2 rounded-md bg-primary text-primary-foreground font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="shimmer-button"
+            disabled={isSubmitting}
           >
-            {isSubmitting ? 'Submitting...' : 'Submit Proposal'}
-          </button>
-
-          <button
+            {isSubmitting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin shrink-0 mr-2" />
+                Submitting...
+              </>
+            ) : (
+              'Submit Proposal'
+            )}
+          </Button>
+          <Button
             type="button"
+            variant="outline"
             onClick={() => router.push('/proposals')}
-            className="px-6 py-2 rounded-md border border-slate-300 text-slate-700 font-medium hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
           >
             Cancel
-          </button>
+          </Button>
 
           {/* Save Status Info */}
           <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
@@ -496,15 +579,30 @@ export default function NewProposalPage() {
       </form>
 
       {/* Help Text */}
-      <div className="rounded-lg border border-slate-200 p-4 text-sm text-muted-foreground dark:border-slate-800">
-        <p className="font-medium mb-2">💡 How this works</p>
-        <ul className="space-y-1 list-disc list-inside">
-          <li><strong>Fill manually</strong> or use <strong>✨ AI Generate</strong> to auto-fill from the job + your knowledge base + strategy</li>
-          <li><strong>Strategy</strong> (in Job Reference): Controls tone and focus. Create strategies under Strategies in the sidebar.</li>
-          <li><strong>Submit Proposal</strong> saves to Proposals and links it to this job</li>
-          <li>Auto-save keeps drafts; drafts recoverable for 24h</li>
-        </ul>
-      </div>
-    </div>
+      <Card>
+        <CardContent className="pt-6">
+          <p className="font-medium mb-2">💡 How this works</p>
+          <ul className="space-y-1 list-disc list-inside text-sm text-muted-foreground">
+            <li><strong>Fill manually</strong> or use <strong>✨ AI Generate</strong> to auto-fill from the job + your knowledge base + strategy</li>
+            <li><strong>Strategy</strong> (in Job Reference): Controls tone and focus. Create strategies under Strategies in the sidebar.</li>
+            <li><strong>Submit Proposal</strong> saves to Proposals and links it to this job</li>
+            <li>Auto-save keeps drafts; drafts recoverable for 24h</li>
+          </ul>
+        </CardContent>
+      </Card>
+    </PageContainer>
+  )
+}
+
+export default function NewProposalPage() {
+  return (
+    <Suspense fallback={
+      <PageContainer>
+        <PageHeader title="New Proposal" />
+        <LoadingSkeleton lines={8} />
+      </PageContainer>
+    }>
+      <NewProposalPageContent />
+    </Suspense>
   )
 }

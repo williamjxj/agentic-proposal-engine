@@ -52,16 +52,16 @@ export function CredentialsList({
                     Inactive
                   </span>
                 )}
-                {credential.verified_at && (
+                {credential.last_verified_at && (
                   <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
                     Verified
                   </span>
                 )}
               </div>
               <div className="mt-2 text-sm text-muted-foreground">
-                <p>API Key: {credential.api_key ? '••••••••' + credential.api_key.slice(-4) : 'Not set'}</p>
-                {credential.verified_at && (
-                  <p className="mt-1">Verified: {new Date(credential.verified_at).toLocaleDateString()}</p>
+                <p>API credentials configured</p>
+                {credential.last_verified_at && (
+                  <p className="mt-1">Verified: {new Date(credential.last_verified_at).toLocaleDateString()}</p>
                 )}
               </div>
             </div>

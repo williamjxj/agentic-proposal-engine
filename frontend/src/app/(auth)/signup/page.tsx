@@ -1,6 +1,7 @@
 /**
  * Signup Page - User Registration
- * Allows new users to create an account
+ * Allows new users to create an account.
+ * Includes "Try as demo user" for first-time visitors.
  */
 
 'use client'
@@ -9,6 +10,10 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
+import { demoUserConfig } from '@/lib/config/demo-user'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 export default function SignupPage() {
   const [email, setEmail] = useState('')
@@ -16,7 +21,7 @@ export default function SignupPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const { signUp } = useAuth()
+  const { signUp, signIn } = useAuth()
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -50,7 +55,30 @@ export default function SignupPage() {
       } else {
         router.push('/dashboard')
       }
-    } catch (err) {
+    } catch (_err) {
+      setError('An unexpected error occurred')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDemoLogin = async () => {
+    if (!demoUserConfig.isAvailable) return
+    setError(null)
+    setLoading(true)
+
+    try {
+      const { error: signInError } = await signIn(
+        demoUserConfig.email,
+        demoUserConfig.password
+      )
+
+      if (signInError) {
+        setError(signInError.message)
+      } else {
+        router.push('/dashboard')
+      }
+    } catch (_err) {
       setError('An unexpected error occurred')
     } finally {
       setLoading(false)
@@ -61,7 +89,9 @@ export default function SignupPage() {
     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-12 dark:bg-slate-950">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
-          <h1 className="text-3xl font-bold tracking-tight">Create your account</h1>
+          <h1 className="text-3xl font-bold tracking-tight">
+            Create your account
+          </h1>
           <p className="mt-2 text-sm text-muted-foreground">
             Start generating AI-powered proposals today
           </p>
@@ -76,10 +106,8 @@ export default function SignupPage() {
 
           <div className="space-y-4 rounded-lg border bg-card p-8 shadow-sm">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium">
-                Email address
-              </label>
-              <input
+              <Label htmlFor="email">Email address</Label>
+              <Input
                 id="email"
                 name="email"
                 type="email"
@@ -87,16 +115,14 @@ export default function SignupPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 placeholder="you@example.com"
+                className="mt-2"
               />
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium">
-                Password
-              </label>
-              <input
+              <Label htmlFor="password">Password</Label>
+              <Input
                 id="password"
                 name="password"
                 type="password"
@@ -104,9 +130,9 @@ export default function SignupPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 placeholder="••••••••"
                 maxLength={72}
+                className="mt-2"
               />
               <p className="mt-1 text-xs text-muted-foreground">
                 Must be 8-72 characters
@@ -114,10 +140,8 @@ export default function SignupPage() {
             </div>
 
             <div>
-              <label htmlFor="confirm-password" className="block text-sm font-medium">
-                Confirm password
-              </label>
-              <input
+              <Label htmlFor="confirm-password">Confirm password</Label>
+              <Input
                 id="confirm-password"
                 name="confirm-password"
                 type="password"
@@ -125,19 +149,40 @@ export default function SignupPage() {
                 required
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 placeholder="••••••••"
                 maxLength={72}
+                className="mt-2"
               />
             </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            >
+            <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Creating account...' : 'Create account'}
-            </button>
+            </Button>
+
+            {demoUserConfig.isAvailable && (
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-card px-2 text-muted-foreground">
+                    Or try first
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {demoUserConfig.isAvailable && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={handleDemoLogin}
+                disabled={loading}
+              >
+                Try as demo user ({demoUserConfig.email})
+              </Button>
+            )}
           </div>
 
           <p className="text-center text-sm text-muted-foreground">

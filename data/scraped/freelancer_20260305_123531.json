@@ -1,0 +1,147 @@
+{
+    "metadata": {
+        "source": "freelancer",
+        "keywords": [
+            "python"
+        ],
+        "timestamp": "2026-03-05T12:35:31.198131",
+        "count": 5
+    },
+    "jobs": [
+        {
+            "id": "bfcce50750dd22b26865a28463099533",
+            "external_id": "bfcce50750dd22b26865a28463099533",
+            "platform": "freelancer",
+            "title": "Setup Meta Pixel on Custom Website",
+            "company": "Freelancer Client",
+            "description": "I am looking for a professional to set up a Meta Pixel on my custom website. The goal is to ensure that events are tracked accurately and displayed in real-time on the Meta dashboard. This may involve writing custom code for proper implementation. The task needs to be completed within one hour.",
+            "requirements": "",
+            "skills": [
+                "CSS",
+                "HTML",
+                "JavaScript",
+                "PHP",
+                "WordPress"
+            ],
+            "budget_min": 37.0,
+            "budget_max": 37.0,
+            "budget_type": "fixed",
+            "url": "https://www.freelancer.com/projects/css/setup-meta-pixel-custom-website",
+            "posted_at": "2026-03-05T08:35:31.136541",
+            "source": "freelancer_scraper_v1",
+            "status": "new",
+            "client_rating": 4.3
+        },
+        {
+            "id": "8727a089d81e3bf0d606dea44ff1f5da",
+            "external_id": "8727a089d81e3bf0d606dea44ff1f5da",
+            "platform": "freelancer",
+            "title": "Thesis to Journal Paper Specialist Needed",
+            "company": "Freelancer Client",
+            "description": "I need assistance in publishing 3-4 journal-level papers derived from my master's thesis in Materials Science and Mechanical Engineering, specifically on Dynamic Testing. \n\nI require help with:  \n- Writing and structuring papers  \n  - Literature review  \n  - Methodology and results  \n  - Discussion and conclusion  \n- Editing and proofreading  \n  - Grammar and spelling corrections  \n  - Technical accuracy  \n  - Formatting according to journal guidelines  \n- Selecting appropriate journals for submission  \n\nIdeal candidates should have:  \n- A strong background in Materials Science or Mechanical Engineering  \n- Experience in academic writing and publishing  \n- Familiarity with journal submission processes  \n- Excellent editing and proofreading skills  \n\nPlease provide samples of previous ...",
+            "requirements": "",
+            "skills": [
+                "Academic Writing",
+                "Editing",
+                "Materials Science",
+                "Mechanical Engineering",
+                "Proofreading",
+                "Publishing",
+                "Research Writing",
+                "Technical Writing"
+            ],
+            "budget_min": 750.0,
+            "budget_max": 1500.0,
+            "budget_type": "fixed",
+            "url": "https://www.freelancer.com/projects/academic-writing/thesis-journal-paper-specialist-needed",
+            "posted_at": "2026-03-03T19:35:31.139763",
+            "source": "freelancer_scraper_v1",
+            "status": "new",
+            "client_rating": 4.8
+        },
+        {
+            "id": "d300ed0f59a4f7d263ebb25f31561c6c",
+            "external_id": "d300ed0f59a4f7d263ebb25f31561c6c",
+            "platform": "freelancer",
+            "title": "Node.js AirPay Payment Integration",
+            "company": "Freelancer Client",
+            "description": "I\u2019m adding AirPay to the existing Node.js backend and need a clean, production-ready module that handles straight-forward payment processing. The service must accept credit/debit cards, digital wallets, and bank transfers through AirPay\u2019s API, expose clear endpoints for initiating a charge, capture the asynchronous callback, and return the final transaction status to the frontend.\n\nThe codebase is an Express app written in modern JavaScript. Please wire the AirPay SDK (or raw REST calls if you prefer) into a dedicated service layer, include middleware for request validation and error handling, and document every environment variable or secret the system requires. Unit tests covering happy-path and typical failure scenarios are essential, and I\u2019ll run test credentials in a...",
+            "requirements": "",
+            "skills": [
+                "AngularJS",
+                "API Development",
+                "Java",
+                "JavaScript",
+                "Node.js",
+                "Payment Gateway Integration",
+                "Payment Processing",
+                "RESTful API"
+            ],
+            "budget_min": 33.0,
+            "budget_max": 33.0,
+            "budget_type": "fixed",
+            "url": "https://www.freelancer.com/projects/api-developmet/node-airpay-payment-integration",
+            "posted_at": "2026-03-05T05:35:31.140990",
+            "source": "freelancer_scraper_v1",
+            "status": "new",
+            "client_rating": 4.5
+        },
+        {
+            "id": "4dcdf2bfe4c7170c38d93f289b3080cc",
+            "external_id": "4dcdf2bfe4c7170c38d93f289b3080cc",
+            "platform": "freelancer",
+            "title": "Evacuation Plan Design for Property",
+            "company": "Freelancer Client",
+            "description": "Hello,\n\nI am attaching the floor plan of my property. Please convert it into a professional hotel-style emergency evacuation map required for a short-term rental safety inspection in Fort Lauderdale, Florida (USA).\n\nIMPORTANT  \nPlease do not modify the floor plan layout. The walls, rooms, doors, and windows must remain exactly as drawn.\n\nLegend in my drawing  \nB = Bathroom  \nC = Closet\n\nRooms in the plan\nBedroom 1  \nBedroom 2  \nBedroom 3  \nLiving Room  \nKitchen\n\nSAFETY ITEMS TO INCLUDE\n\nSmoke detectors\n\u2022 One smoke detector inside each bedroom\n\nSmoke + Carbon Monoxide detectors\n\u2022 One combination CO + Smoke detector in the hallway outside the bedrooms\n\nFire extinguisher\n\u2022 Located in the Kitchen\n\nExit doors\n\u2022 Main exit: double doors in the Living Room (front entrance)\n&bul...",
+            "requirements": "",
+            "skills": [
+                "3D Rendering",
+                "Adobe Illustrator",
+                "Adobe Photoshop",
+                "AutoCAD",
+                "Building Architecture",
+                "Building Design",
+                "Graphic Design",
+                "Illustration",
+                "Interior Design"
+            ],
+            "budget_min": 29.0,
+            "budget_max": 29.0,
+            "budget_type": "fixed",
+            "url": "https://www.freelancer.com/projects/graphic-design/evacuation-plan-design-for-property",
+            "posted_at": "2026-03-05T08:35:31.141418",
+            "source": "freelancer_scraper_v1",
+            "status": "new",
+            "client_rating": 4.4
+        },
+        {
+            "id": "d05bcb8c377218c6a83251a081907b96",
+            "external_id": "d05bcb8c377218c6a83251a081907b96",
+            "platform": "freelancer",
+            "title": "Website Speed Boost -- 2",
+            "company": "Freelancer Client",
+            "description": "The goal of this project is to significantly improve the website\u2019s loading speed and overall performance, ensuring a load time of under 3 seconds on both mobile and desktop devices. Faster website performance will enhance user experience, reduce bounce rate, and improve SEO rankings and conversion rates.\n\nProject Objectives\n\t\u2022\tAchieve page load time below 3 seconds on mobile and desktop\n\t\u2022\tImprove Google PageSpeed Insights, Core Web Vitals, and Lighthouse scores\n\t\u2022\tOptimize website for better user experience and search engine performance\n\t\u2022\tEnsure smooth performance without affecting design or functionality\n\nScope of Work\n\t\u2022\tImage optimization and next-gen format implementation (WebP/AVIF)\n\t\u2022\tMinification of CSS, JavaScript, and HTML files\n\t\u2022\tBrowse...",
+            "requirements": "",
+            "skills": [
+                "CSS",
+                "Google PageSpeed Insights",
+                "HTML",
+                "JavaScript",
+                "Performance Tuning",
+                "PHP",
+                "Web Design",
+                "Web Development",
+                "Web Security",
+                "Website Optimization"
+            ],
+            "budget_min": 16.0,
+            "budget_max": 16.0,
+            "budget_type": "fixed",
+            "url": "https://www.freelancer.com/projects/php/website-speed-boost-40277628",
+            "posted_at": "2026-03-04T08:35:31.141808",
+            "source": "freelancer_scraper_v1",
+            "status": "new",
+            "client_rating": 4.9
+        }
+    ]
+}

@@ -15,6 +15,9 @@ import { useKeywords, useDeleteKeyword } from '@/hooks/useKeywords'
 import type { KeywordFilters } from '@/types/keywords'
 import { KeywordList } from '@/components/keywords/keyword-list'
 import { KeywordForm } from '@/components/keywords/keyword-form'
+import { PageHeader } from '@/components/shared/page-header'
+import { PageContainer } from '@/components/shared/page-container'
+import { Button } from '@/components/ui/button'
 
 export default function KeywordsPage() {
   const { getFilters, setFilters, getScrollPosition, setScrollPosition } = useSessionState()
@@ -108,29 +111,24 @@ export default function KeywordsPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
-        <h1 className="text-3xl font-bold">Keywords</h1>
+      <PageContainer>
+        <PageHeader
+          title="Keywords"
+          description="Manage search keywords for job discovery"
+        />
         <LoadingSkeleton lines={5} />
-      </div>
+      </PageContainer>
     )
   }
 
   return (
-    <div className="space-y-6" ref={scrollContainerRef}>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Keywords</h1>
-          <p className="text-muted-foreground mt-2">
-            Manage search keywords for job discovery
-          </p>
-        </div>
-        <button
-          onClick={handleCreate}
-          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-        >
-          Add Keyword
-        </button>
-      </div>
+    <PageContainer ref={scrollContainerRef} className="space-y-6">
+      <PageHeader
+        title="Keywords"
+        description="Manage search keywords for job discovery"
+      >
+        <Button onClick={handleCreate}>Add Keyword</Button>
+      </PageHeader>
 
       {/* Filters */}
       <div className="flex gap-4">
@@ -207,6 +205,6 @@ export default function KeywordsPage() {
           }}
         />
       )}
-    </div>
+    </PageContainer>
   )
 }

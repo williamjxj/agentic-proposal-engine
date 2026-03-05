@@ -70,7 +70,7 @@ export class ConflictHandler {
     switch (resolution) {
       case 'keep_server':
         // Use server's version
-        return conflictInfo.serverDraft?.draft_data || {}
+        return conflictInfo.serverDraft?.draftData || {}
       
       case 'keep_client':
         // Use client's version
@@ -79,14 +79,14 @@ export class ConflictHandler {
       case 'manual_merge':
         // Attempt automatic merge (prefer client for most fields)
         return this.attemptAutoMerge(
-          conflictInfo.serverDraft?.draft_data || {},
+          conflictInfo.serverDraft?.draftData || {},
           conflictInfo.clientData
         )
       
       default:
         // Default to server data for safety
         console.warn(`Unknown resolution strategy: ${resolution}, defaulting to server data`)
-        return conflictInfo.serverDraft?.draft_data || {}
+        return conflictInfo.serverDraft?.draftData || {}
     }
   }
 
@@ -165,7 +165,7 @@ export class ConflictHandler {
   getRecommendedResolution(conflictInfo: ConflictInfo): ConflictResolution {
     // If auto-merge is safe, recommend it
     if (this.canAutoMerge(
-      conflictInfo.serverDraft?.draft_data || {},
+      conflictInfo.serverDraft?.draftData || {},
       conflictInfo.clientData
     )) {
       return 'manual_merge'

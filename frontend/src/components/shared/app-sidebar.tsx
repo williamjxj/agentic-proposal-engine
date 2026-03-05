@@ -7,9 +7,12 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { useSessionState } from '@/hooks/useSessionState'
+import { useSidebar } from '@/lib/sidebar/sidebar-context'
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
+import { Button } from '@/components/ui/button'
 import { Wifi, WifiOff } from 'lucide-react'
 
 const navigation = [
@@ -25,10 +28,10 @@ const navigation = [
 
 export function AppSidebar() {
   const pathname = usePathname()
-  const router = useRouter()
   const { isOnline, updateNavigation, canGoBack, goBack } = useSessionState()
+  const { mobileOpen, closeMobile } = useSidebar()
 
-  const handleNavigation = async (href: string, event: React.MouseEvent) => {
+  const handleNavigation = async (href: string, _e: React.MouseEvent) => {
     // Let Next.js handle the navigation, but track it in session state
     // Don't prevent default - we want normal browser behavior
     try {
@@ -38,8 +41,47 @@ export function AppSidebar() {
     }
   }
 
+  const navLinks = (
+    <>
+      {canGoBack && (
+        <button
+          onClick={goBack}
+          className="mb-2 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+        >
+          <span>←</span>
+          <span>Back</span>
+        </button>
+      )}
+      {navigation.map((item) => {
+        const isActive =
+          pathname === item.href || pathname.startsWith(item.href + '/')
+        return (
+          <Link
+            key={item.name}
+            href={item.href}
+            onClick={(e) => {
+              handleNavigation(item.href, e)
+              closeMobile()
+            }}
+            className={cn(
+              'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+              isActive
+                ? 'bg-primary text-primary-foreground ring-2 ring-primary/30 ring-offset-2 ring-offset-background shadow-sm'
+                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+            )}
+          >
+            <span className="text-lg">{item.icon}</span>
+            <span>{item.name}</span>
+          </Link>
+        )
+      })}
+    </>
+  )
+
   return (
-    <aside className="flex w-64 flex-col border-r bg-card">
+    <>
+    {/* Desktop sidebar - hidden on mobile */}
+    <aside className="hidden md:flex w-64 flex-shrink-0 flex-col border-r bg-card">
       <div className="flex h-16 items-center justify-between border-b px-6">
         <Link href="/dashboard" className="flex items-center gap-2">
           <Image
@@ -53,47 +95,17 @@ export function AppSidebar() {
         </Link>
         
         {/* Online/offline indicator */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1" title={isOnline ? 'Online' : 'Offline'}>
           {isOnline ? (
-            <Wifi className="h-4 w-4 text-green-600 dark:text-green-400" title="Online" />
+            <Wifi className="h-4 w-4 text-green-600 dark:text-green-400" />
           ) : (
-            <WifiOff className="h-4 w-4 text-red-600 dark:text-red-400" title="Offline" />
+            <WifiOff className="h-4 w-4 text-red-600 dark:text-red-400" />
           )}
         </div>
       </div>
 
       <nav className="flex-1 space-y-1 p-4">
-        {/* Back button if navigation history exists */}
-        {canGoBack && (
-          <button
-            onClick={goBack}
-            className="mb-2 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
-          >
-            <span>←</span>
-            <span>Back</span>
-          </button>
-        )}
-
-        {navigation.map((item) => {
-          const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-
-          return (
-            <Link
-              key={item.name}
-              href={item.href}
-              onClick={(e) => handleNavigation(item.href, e)}
-              className={cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-                isActive
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-              )}
-            >
-              <span className="text-lg">{item.icon}</span>
-              <span>{item.name}</span>
-            </Link>
-          )
-        })}
+        {navLinks}
       </nav>
 
       <div className="border-t p-4">
@@ -107,5 +119,32 @@ export function AppSidebar() {
         </p>
       </div>
     </aside>
+
+    {/* Mobile sidebar sheet */}
+    <Sheet open={mobileOpen} onOpenChange={(open) => !open && closeMobile()}>
+      <SheetContent side="left" className="w-72 p-0">
+        <SheetTitle className="sr-only">Navigation menu</SheetTitle>
+        <div className="flex h-full flex-col pt-16">
+          <div className="flex h-14 items-center border-b px-4">
+            <Link href="/dashboard" onClick={closeMobile} className="flex items-center gap-2">
+              <Image
+                src="/logo-compact.svg"
+                alt="Auto Bidder"
+                width={120}
+                height={30}
+                className="h-7 w-auto"
+              />
+            </Link>
+          </div>
+          <nav className="flex-1 space-y-1 p-4">
+            {navLinks}
+          </nav>
+          <div className="border-t p-4">
+            <p className="text-xs text-muted-foreground">v0.1.0 - Beta</p>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
+    </>
   )
 }

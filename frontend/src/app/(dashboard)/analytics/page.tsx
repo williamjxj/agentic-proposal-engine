@@ -11,6 +11,8 @@ import { useEffect, useState } from 'react'
 import { useSessionState } from '@/hooks/useSessionState'
 import { useNavigationTiming } from '@/hooks/useNavigationTiming'
 import { LoadingSkeleton } from '@/components/workflow/progress-overlay'
+import { PageHeader } from '@/components/shared/page-header'
+import { PageContainer } from '@/components/shared/page-container'
 
 interface AnalyticsFilters {
   timeRange: string
@@ -70,21 +72,22 @@ export default function AnalyticsPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
-        <h1 className="text-3xl font-bold">Analytics</h1>
+      <PageContainer>
+        <PageHeader
+          title="Analytics"
+          description="Track your performance and workflow metrics"
+        />
         <LoadingSkeleton lines={6} />
-      </div>
+      </PageContainer>
     )
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Analytics</h1>
-        <p className="text-muted-foreground mt-2">
-          Track your performance and workflow metrics
-        </p>
-      </div>
+    <PageContainer>
+      <PageHeader
+        title="Analytics"
+        description="Track your performance and workflow metrics"
+      />
 
       {/* Filters */}
       <div className="flex gap-4">
@@ -189,12 +192,18 @@ export default function AnalyticsPage() {
         </div>
       )}
 
-      {/* Chart Placeholder */}
-      <div className="rounded-lg border border-slate-200 p-12 text-center dark:border-slate-800">
-        <p className="text-muted-foreground">
-          📊 Charts and detailed analytics coming soon
-        </p>
+      {/* Charts and Detailed Analytics - Coming Soon */}
+      <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/50 dark:border-slate-700 dark:bg-slate-900/30 p-16 text-center">
+        <div className="mx-auto max-w-md">
+          <p className="text-5xl mb-4" aria-hidden>📊</p>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">
+            Charts and Detailed Analytics Coming Soon
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            We&apos;re building interactive charts for proposal trends, acceptance rates over time, revenue metrics, and platform performance. Check back soon.
+          </p>
+        </div>
       </div>
-    </div>
+    </PageContainer>
   )
 }

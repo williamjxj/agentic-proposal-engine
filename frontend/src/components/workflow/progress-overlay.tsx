@@ -146,3 +146,29 @@ export function LoadingSkeleton({ lines = 3 }: { lines?: number }) {
     </div>
   )
 }
+
+/**
+ * Card-style skeleton for projects/proposals lists
+ */
+export function CardListSkeleton({ count = 3 }: { count?: number }) {
+  return (
+    <div className="grid gap-4">
+      {Array.from({ length: count }).map((_, i) => (
+        <div
+          key={i}
+          className="rounded-lg border border-slate-200 p-6 dark:border-slate-800"
+        >
+          <div className="animate-pulse space-y-3">
+            <div className="h-5 w-3/4 rounded bg-slate-200 dark:bg-slate-700" />
+            <div className="h-4 w-full rounded bg-slate-200 dark:bg-slate-700" />
+            <div className="h-4 w-5/6 rounded bg-slate-200 dark:bg-slate-700" />
+            <div className="flex gap-2 pt-2">
+              <div className="h-6 w-16 rounded-full bg-slate-200 dark:bg-slate-700" />
+              <div className="h-6 w-20 rounded-full bg-slate-200 dark:bg-slate-700" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}

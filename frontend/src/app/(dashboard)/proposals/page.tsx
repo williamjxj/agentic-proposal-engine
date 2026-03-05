@@ -11,7 +11,14 @@ import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSessionState } from '@/hooks/useSessionState'
 import { useNavigationTiming } from '@/hooks/useNavigationTiming'
-import { LoadingSkeleton } from '@/components/workflow/progress-overlay'
+import { LoadingSkeleton, CardListSkeleton } from '@/components/workflow/progress-overlay'
+import { PageHeader } from '@/components/shared/page-header'
+import { PageContainer } from '@/components/shared/page-container'
+import { EmptyState } from '@/components/shared/empty-state'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardFooter } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 
 interface ProposalFilters {
   search: string
@@ -128,44 +135,41 @@ export default function ProposalsPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
-        <h1 className="text-3xl font-bold">Proposals</h1>
-        <LoadingSkeleton lines={5} />
-      </div>
+      <PageContainer>
+        <PageHeader
+          title="Proposals"
+          description="Create and manage your project proposals"
+        />
+        <div className="space-y-6">
+          <LoadingSkeleton lines={1} />
+          <CardListSkeleton count={5} />
+        </div>
+      </PageContainer>
     )
   }
 
   return (
-    <div className="space-y-6" ref={scrollContainerRef}>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Proposals</h1>
-          <p className="text-muted-foreground mt-2">
-            Create and manage your project proposals
-          </p>
-        </div>
-        <button 
-          onClick={handleNewProposal}
-          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-        >
-          New Proposal
-        </button>
-      </div>
+    <PageContainer ref={scrollContainerRef} className="space-y-6">
+      <PageHeader
+        title="Proposals"
+        description="Create and manage your project proposals"
+      >
+        <Button onClick={handleNewProposal}>New Proposal</Button>
+      </PageHeader>
 
       {/* Filters */}
-      <div className="flex gap-4">
-        <input
+      <div className="flex flex-col sm:flex-row gap-3">
+        <Input
           type="text"
           placeholder="Search proposals..."
           value={filters.search}
           onChange={(e) => setLocalFilters({ ...filters, search: e.target.value })}
-          className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+          className="flex-1"
         />
-        
         <select
           value={filters.status}
           onChange={(e) => setLocalFilters({ ...filters, status: e.target.value })}
-          className="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+          className="rounded-md border border-input bg-background px-3 py-2 text-sm"
         >
           <option value="all">All Status</option>
           <option value="draft">Draft</option>
@@ -179,7 +183,7 @@ export default function ProposalsPage() {
         <select
           value={filters.sortBy}
           onChange={(e) => setLocalFilters({ ...filters, sortBy: e.target.value })}
-          className="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+          className="rounded-md border border-input bg-background px-3 py-2 text-sm"
         >
           <option value="created">Date Created</option>
           <option value="updated">Last Updated</option>
@@ -190,38 +194,51 @@ export default function ProposalsPage() {
       {/* Proposals List */}
       <div className="grid gap-4">
         {proposals.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-slate-300 p-12 text-center dark:border-slate-700">
-            <p className="text-muted-foreground">No proposals found</p>
-            <button 
-              onClick={handleNewProposal}
-              className="mt-4 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-            >
-              Create First Proposal
-            </button>
-          </div>
+          <EmptyState
+            title="No proposals found"
+            description="Create your first proposal to start winning freelance projects."
+            icon={<span className="text-4xl">📝</span>}
+            action={
+              <Button onClick={handleNewProposal}>Create First Proposal</Button>
+            }
+          />
         ) : (
           proposals.map((proposal) => (
-            <div
+            <Card
               key={proposal.id}
               onClick={() => handleProposalClick(proposal.id)}
-              className="cursor-pointer rounded-lg border border-slate-200 p-4 hover:border-primary hover:shadow-md transition-all dark:border-slate-800 dark:hover:border-primary"
+              className="cursor-pointer transition-all hover:shadow-md hover:border-primary/50"
             >
-              <h3 className="font-semibold">{proposal.title}</h3>
-              {proposal.description && (
-                <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
-                  {proposal.description}
-                </p>
-              )}
-              <div className="mt-2 flex items-center gap-4 text-sm text-muted-foreground">
-                <span className="capitalize">{proposal.status}</span>
-                {proposal.budget && <span>{proposal.budget}</span>}
-                {proposal.timeline && <span>{proposal.timeline}</span>}
-                <span>Created: {new Date(proposal.created_at).toLocaleDateString()}</span>
-              </div>
-            </div>
+              <CardContent className="pt-6">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <h3 className="font-semibold text-lg">{proposal.title}</h3>
+                  <Badge
+                    variant={proposal.status === 'won' ? 'default' : proposal.status === 'lost' ? 'destructive' : 'secondary'}
+                    className="capitalize shrink-0"
+                  >
+                    {proposal.status}
+                  </Badge>
+                </div>
+                {proposal.description && (
+                  <p className="mt-2 text-sm text-muted-foreground line-clamp-2">
+                    {proposal.description}
+                  </p>
+                )}
+                <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                  {proposal.budget && <span>💰 {proposal.budget}</span>}
+                  {proposal.timeline && <span>📅 {proposal.timeline}</span>}
+                  {'job_title' in proposal && proposal.job_title && (
+                    <span className="truncate max-w-[200px]" title={proposal.job_title}>
+                      📎 {proposal.job_title}
+                    </span>
+                  )}
+                  <span>Created {new Date(proposal.created_at).toLocaleDateString()}</span>
+                </div>
+              </CardContent>
+            </Card>
           ))
         )}
       </div>
-    </div>
+    </PageContainer>
   )
 }

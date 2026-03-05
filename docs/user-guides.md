@@ -55,7 +55,7 @@ Click **AI Generate** next to the Description field. The backend uses RAG (your 
 
 ### 6. Submit
 
-Review the proposal, edit if needed, then click **Submit Proposal**. Drafts auto-save every ~300ms.
+Review the proposal, edit if needed, then click **Submit Proposal**. The proposal is created directly from the form and saved to your Proposals list. Drafts auto-save in the background (~300ms) for recovery if you leave the page.
 
 ---
 

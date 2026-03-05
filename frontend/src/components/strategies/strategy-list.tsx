@@ -6,6 +6,9 @@
 
 'use client'
 
+import { Card, CardContent } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import type { Strategy } from '@/types/strategies'
 
 interface StrategyListProps {
@@ -37,22 +40,18 @@ export function StrategyList({
   return (
     <div className="grid gap-4">
       {strategies.map((strategy) => (
-        <div
-          key={strategy.id}
-          className="rounded-lg border border-slate-200 p-4 hover:border-primary hover:shadow-md transition-all dark:border-slate-800 dark:hover:border-primary"
-        >
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <h3 className="font-semibold">{strategy.name}</h3>
+        <Card key={strategy.id} className="transition-all hover:shadow-md hover:border-primary/50">
+          <CardContent className="pt-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="font-semibold text-lg">{strategy.name}</h3>
                 {strategy.is_default && (
-                  <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
-                    Default
-                  </span>
+                  <Badge variant="default">Default</Badge>
                 )}
-                <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs text-purple-800 dark:bg-purple-900/30 dark:text-purple-400 capitalize">
+                <Badge variant="secondary" className="capitalize">
                   {strategy.tone}
-                </span>
+                </Badge>
               </div>
               {strategy.description && (
                 <p className="text-sm text-muted-foreground mt-1">{strategy.description}</p>
@@ -65,46 +64,32 @@ export function StrategyList({
               {strategy.focus_areas && strategy.focus_areas.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1">
                   {strategy.focus_areas.map((area, idx) => (
-                    <span
-                      key={idx}
-                      className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                    >
+                    <Badge key={idx} variant="outline">
                       {area}
-                    </span>
+                    </Badge>
                   ))}
                 </div>
               )}
             </div>
-            <div className="flex items-center gap-2 ml-4">
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
               {!strategy.is_default && (
-                <button
-                  onClick={() => onSetDefault(strategy.id)}
-                  className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
-                >
+                <Button variant="outline" size="sm" onClick={() => onSetDefault(strategy.id)}>
                   Set Default
-                </button>
+                </Button>
               )}
-              <button
-                onClick={() => onTest(strategy.id)}
-                className="rounded-md border border-green-300 px-3 py-1.5 text-sm font-medium text-green-600 hover:bg-green-50 dark:border-green-800 dark:text-green-400 dark:hover:bg-green-900/20"
-              >
+              <Button variant="outline" size="sm" className="text-green-600 border-green-300 dark:text-green-400" onClick={() => onTest(strategy.id)}>
                 Test
-              </button>
-              <button
-                onClick={() => onEdit(strategy.id)}
-                className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
-              >
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => onEdit(strategy.id)}>
                 Edit
-              </button>
-              <button
-                onClick={() => onDelete(strategy.id)}
-                className="rounded-md border border-red-300 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
-              >
+              </Button>
+              <Button variant="outline" size="sm" className="text-red-600 border-red-300 dark:text-red-400" onClick={() => onDelete(strategy.id)}>
                 Delete
-              </button>
+              </Button>
             </div>
           </div>
-        </div>
+          </CardContent>
+        </Card>
       ))}
     </div>
   )

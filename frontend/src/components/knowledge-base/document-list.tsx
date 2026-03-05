@@ -6,6 +6,9 @@
 
 'use client'
 
+import { Card, CardContent } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import type { Document } from '@/types/knowledge-base'
 
 interface DocumentListProps {
@@ -50,18 +53,16 @@ export function DocumentList({ documents, onDelete, onReprocess }: DocumentListP
   return (
     <div className="grid gap-4">
       {documents.map((document) => (
-        <div
-          key={document.id}
-          className="rounded-lg border border-slate-200 p-4 hover:border-primary hover:shadow-md transition-all dark:border-slate-800 dark:hover:border-primary"
-        >
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <h3 className="font-semibold">{document.filename}</h3>
+        <Card key={document.id} className="transition-all hover:shadow-md hover:border-primary/50">
+          <CardContent className="pt-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="font-semibold text-lg">{document.filename}</h3>
                 {getStatusBadge(document.processing_status)}
-                <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs text-purple-800 dark:bg-purple-900/30 dark:text-purple-400 capitalize">
+                <Badge variant="secondary" className="capitalize">
                   {document.collection.replace('_', ' ')}
-                </span>
+                </Badge>
               </div>
               <div className="mt-2 flex items-center gap-4 text-sm text-muted-foreground">
                 <span>Type: {document.file_type.toUpperCase()}</span>
@@ -92,24 +93,19 @@ export function DocumentList({ documents, onDelete, onReprocess }: DocumentListP
                 </a>
               )}
             </div>
-            <div className="flex items-center gap-2 ml-4">
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
               {document.processing_status === 'completed' && (
-                <button
-                  onClick={() => onReprocess(document.id)}
-                  className="rounded-md border border-blue-300 px-3 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20"
-                >
+                <Button variant="outline" size="sm" className="text-blue-600 border-blue-300 dark:text-blue-400" onClick={() => onReprocess(document.id)}>
                   Reprocess
-                </button>
+                </Button>
               )}
-              <button
-                onClick={() => onDelete(document.id)}
-                className="rounded-md border border-red-300 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
-              >
+              <Button variant="outline" size="sm" className="text-red-600 border-red-300 dark:text-red-400" onClick={() => onDelete(document.id)}>
                 Delete
-              </button>
+              </Button>
             </div>
           </div>
-        </div>
+          </CardContent>
+        </Card>
       ))}
     </div>
   )

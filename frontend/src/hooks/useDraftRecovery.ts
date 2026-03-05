@@ -60,7 +60,7 @@ export function useDraftRecovery(options: UseDraftRecoveryOptions): UseDraftReco
         useCache: true,
       })
 
-      if (existingDraft && existingDraft.draft_data) {
+      if (existingDraft && existingDraft.draftData) {
         setDraft(existingDraft)
         setShowRecoveryPrompt(true)
       }

@@ -46,7 +46,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
         return this.props.fallback
       }
 
-      const formattedError = errorFormatter(this.state.error)
+      const formattedError = errorFormatter.format(this.state.error)
 
       return (
         <div className="rounded-lg border border-red-200 bg-red-50 p-6 dark:border-red-800 dark:bg-red-900/20">

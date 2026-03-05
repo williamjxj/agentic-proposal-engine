@@ -8,6 +8,7 @@
 
 import { useState, useRef } from 'react'
 import { useUploadDocument } from '@/hooks/useKnowledgeBase'
+import { Loader2 } from 'lucide-react'
 import type { DocumentCollection } from '@/types/knowledge-base'
 
 interface DocumentUploadProps {
@@ -69,8 +70,8 @@ export function DocumentUpload({ onSuccess, onClose }: DocumentUploadProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="w-full max-w-lg rounded-lg border border-slate-200 bg-white p-6 shadow-lg dark:border-slate-800 dark:bg-slate-900">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
+      <div className="w-full max-w-lg rounded-lg border border-slate-200 bg-white p-4 sm:p-6 shadow-lg dark:border-slate-800 dark:bg-slate-900 max-h-[90vh] overflow-y-auto my-auto">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-xl font-semibold">Upload Document</h2>
           <button
@@ -141,9 +142,16 @@ export function DocumentUpload({ onSuccess, onClose }: DocumentUploadProps) {
             <button
               type="submit"
               disabled={uploadMutation.isPending || !selectedFile}
-              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 min-w-[100px]"
             >
-              {uploadMutation.isPending ? 'Uploading...' : 'Upload'}
+              {uploadMutation.isPending ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Uploading...
+                </span>
+              ) : (
+                'Upload'
+              )}
             </button>
           </div>
         </form>

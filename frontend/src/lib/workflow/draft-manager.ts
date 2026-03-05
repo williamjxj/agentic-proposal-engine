@@ -39,8 +39,8 @@ export class DraftManager {
       // Save to server
       const entityIdParam = entityId || 'new'
       const result = await apiSaveDraft(entityType, entityIdParam, {
-        draft_data: draftData,
-        version,
+        draftData,
+        expectedVersion: version,
       })
 
       return result
@@ -80,14 +80,16 @@ export class DraftManager {
           console.debug('Draft loaded from cache')
           return {
             id: 'cached',
-            user_id: '',
-            entity_type: entityType,
-            entity_id: entityId,
-            draft_data: cached,
-            version: 0,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            last_saved_at: new Date().toISOString(),
+            userId: '',
+            entityType: entityType as DraftWork['entityType'],
+            entityId: entityId ?? null,
+            draftData: cached,
+            draftVersion: 0,
+            autoSaveCount: 0,
+            isRecovered: false,
+            expiresAt: new Date().toISOString(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
           }
         }
       }
@@ -98,7 +100,7 @@ export class DraftManager {
 
       // Update cache with server data
       if (result && useCache) {
-        await DraftCache.set(entityType, entityId, result.draft_data)
+        await DraftCache.set(entityType, entityId, result.draftData)
       }
 
       return result
@@ -112,14 +114,16 @@ export class DraftManager {
           console.debug('Draft loaded from cache (server failed)')
           return {
             id: 'cached',
-            user_id: '',
-            entity_type: entityType,
-            entity_id: entityId,
-            draft_data: cached,
-            version: 0,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            last_saved_at: new Date().toISOString(),
+            userId: '',
+            entityType: entityType as DraftWork['entityType'],
+            entityId: entityId ?? null,
+            draftData: cached,
+            draftVersion: 0,
+            autoSaveCount: 0,
+            isRecovered: false,
+            expiresAt: new Date().toISOString(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
           }
         }
       }

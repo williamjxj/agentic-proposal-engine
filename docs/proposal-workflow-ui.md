@@ -52,7 +52,7 @@ Successfully integrated job discovery with AI-powered proposal generation, creat
    ↓
 9. User reviews and submits proposal
    ↓
-10. Proposal saved with auto-save drafts
+10. Submit creates proposal directly from form (POST /api/proposals); draft is discarded. Drafts auto-save in background for recovery only.
 ```
 
 ### URL Flow
@@ -300,6 +300,10 @@ const handleAIGenerate = async () => {
 | `platform` | `jobPlatform` | Context display | Shown in reference card |
 | `skills[]` | `jobSkills` | `skills` | Comma-separated join |
 | `budget` | `jobBudget` | `budget` | "$min - $max" format |
+
+### Submit Behavior
+
+**Submit creates the proposal directly from the form** via `POST /api/proposals`. No draft dependency—the form is the source of truth. After success, the draft is discarded. Auto-save runs in the background for recovery (e.g., if the user leaves and returns within 24 hours).
 
 ### State Management
 
@@ -606,7 +610,7 @@ The proposal generation workflow integration is **complete and functional**. Use
 2. Generate proposals with one click
 3. See job context while writing
 4. Get AI assistance (foundation ready)
-5. Auto-save drafts safely
+5. Submit proposals reliably (form-direct; drafts for recovery only)
 
 **Next Steps:**
 - Integrate RAG backend for real AI generation

@@ -21,6 +21,9 @@ import type { TestStrategyRequest, TestProposal } from '@/types/strategies'
 import { StrategyList } from '@/components/strategies/strategy-list'
 import { StrategyForm } from '@/components/strategies/strategy-form'
 import { StrategyPreview } from '@/components/strategies/strategy-preview'
+import { PageHeader } from '@/components/shared/page-header'
+import { PageContainer } from '@/components/shared/page-container'
+import { Button } from '@/components/ui/button'
 
 export default function StrategiesPage() {
   const { getScrollPosition, setScrollPosition } = useSessionState()
@@ -127,29 +130,24 @@ export default function StrategiesPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
-        <h1 className="text-3xl font-bold">Strategies</h1>
+      <PageContainer>
+        <PageHeader
+          title="Strategies"
+          description="Manage AI prompt templates for proposal generation"
+        />
         <LoadingSkeleton lines={5} />
-      </div>
+      </PageContainer>
     )
   }
 
   return (
-    <div className="space-y-6" ref={scrollContainerRef}>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Strategies</h1>
-          <p className="text-muted-foreground mt-2">
-            Manage AI prompt templates for proposal generation
-          </p>
-        </div>
-        <button
-          onClick={handleCreate}
-          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-        >
-          Create Strategy
-        </button>
-      </div>
+    <PageContainer ref={scrollContainerRef} className="space-y-6">
+      <PageHeader
+        title="Strategies"
+        description="Manage AI prompt templates for proposal generation"
+      >
+        <Button onClick={handleCreate}>Create Strategy</Button>
+      </PageHeader>
 
       {/* Error Display */}
       {error && (
@@ -192,6 +190,6 @@ export default function StrategiesPage() {
           onClose={() => setTestProposal(null)}
         />
       )}
-    </div>
+    </PageContainer>
   )
 }

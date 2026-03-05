@@ -6,15 +6,28 @@
 'use client'
 
 import { useAuth } from '@/hooks/useAuth'
+import { useSidebar } from '@/lib/sidebar/sidebar-context'
 import { getInitials } from '@/lib/utils'
 import { ThemeSwitcher } from './theme-switcher'
+import { Button } from '@/components/ui/button'
+import { Menu } from 'lucide-react'
 
 export function TopHeader() {
   const { user, signOut } = useAuth()
+  const { openMobile } = useSidebar()
 
   return (
-    <header className="flex h-16 items-center justify-between border-b bg-card px-6">
-      <div className="flex items-center gap-4">
+    <header className="flex h-16 items-center justify-between border-b bg-card px-4 md:px-6">
+      <div className="flex items-center gap-3">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="md:hidden"
+          onClick={openMobile}
+          aria-label="Open menu"
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
         <h2 className="text-lg font-semibold">Welcome back!</h2>
       </div>
 

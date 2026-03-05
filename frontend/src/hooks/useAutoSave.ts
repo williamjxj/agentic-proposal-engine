@@ -58,17 +58,22 @@ export function useAutoSave(options: UseAutoSaveOptions): UseAutoSaveReturn {
   const checkpointTimerRef = useRef<NodeJS.Timeout>()
   const lastDataRef = useRef<string>(JSON.stringify(data))
   const isSavingRef = useRef(false)
+  const savePromiseRef = useRef<Promise<void> | null>(null)
 
   /**
    * Perform save operation
    */
   const performSave = useCallback(async () => {
-    if (!enabled || isSavingRef.current) return
+    if (!enabled) return
+
+    // Wait for any in-flight save to complete first
+    if (isSavingRef.current && savePromiseRef.current) {
+      await savePromiseRef.current
+    }
 
     // Check if data actually changed
     const currentDataStr = JSON.stringify(data)
     if (currentDataStr === lastDataRef.current && status !== 'idle') {
-      // No changes, don't save
       return
     }
 
@@ -76,8 +81,9 @@ export function useAutoSave(options: UseAutoSaveOptions): UseAutoSaveReturn {
     setStatus('saving')
     setError(null)
 
-    try {
-      const result = await draftManager.saveDraft({
+    const savePromise = (async () => {
+      try {
+        const result = await draftManager.saveDraft({
         entityType,
         entityId,
         draftData: data,
@@ -86,7 +92,7 @@ export function useAutoSave(options: UseAutoSaveOptions): UseAutoSaveReturn {
       })
 
       if (result) {
-        setCurrentVersion(result.version)
+        setCurrentVersion(result.draftVersion)
         setLastSaved(new Date())
         setStatus('saved')
         setHasUnsavedChanges(false)
@@ -101,28 +107,33 @@ export function useAutoSave(options: UseAutoSaveOptions): UseAutoSaveReturn {
           setStatus((prev) => (prev === 'saved' ? 'idle' : prev))
         }, 2000)
       }
-    } catch (err: any) {
-      console.error('Auto-save failed:', err)
-      
-      const errorMessage = err.type === 'conflict' 
-        ? 'Version conflict - please refresh and try again'
-        : 'Failed to save draft'
-      
-      setError(errorMessage)
-      setStatus('error')
+      } catch (err: any) {
+        console.error('Auto-save failed:', err)
+        
+        const errorMessage = err.type === 'conflict' 
+          ? 'Version conflict - please refresh and try again'
+          : 'Failed to save draft'
+        
+        setError(errorMessage)
+        setStatus('error')
 
-      if (onSaveError) {
-        onSaveError(err)
+        if (onSaveError) {
+          onSaveError(err)
+        }
+
+        // Keep error status for 5 seconds
+        setTimeout(() => {
+          setStatus((prev) => (prev === 'error' ? 'idle' : prev))
+          setError(null)
+        }, 5000)
+      } finally {
+        isSavingRef.current = false
+        savePromiseRef.current = null
       }
+    })()
 
-      // Keep error status for 5 seconds
-      setTimeout(() => {
-        setStatus((prev) => (prev === 'error' ? 'idle' : prev))
-        setError(null)
-      }, 5000)
-    } finally {
-      isSavingRef.current = false
-    }
+    savePromiseRef.current = savePromise
+    await savePromise
   }, [enabled, data, entityType, entityId, currentVersion, onSaveSuccess, onSaveError, status])
 
   /**

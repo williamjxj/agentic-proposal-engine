@@ -319,3 +319,59 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Magic UI-style effects (respect prefers-reduced-motion) */
+@keyframes border-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 1px rgb(59 130 246 / 0.3);
+  }
+  50% {
+    box-shadow: 0 0 0 2px rgb(59 130 246 / 0.6), 0 0 12px rgb(59 130 246 / 0.2);
+  }
+}
+
+@keyframes shimmer-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.shine-border {
+  animation: border-glow 3s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shine-border {
+    animation: none;
+  }
+}
+
+.shimmer-button {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.2)
+  );
+  animation: shimmer-slide 2.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer-button::before {
+    animation: none;
+  }
+}

@@ -25,7 +25,8 @@
 
 - **AI proposal generation:** RAG + strategy + LLM; `POST /api/proposals/generate-from-job`
 - **Proposal workflow:** Projects → Discover Jobs → Generate Proposal → AI Generate → Submit
-- **Draft recovery:** Auto-save, conflict resolution, 24h draft retention
+- **Submit:** Creates proposal directly from form (`POST /api/proposals`); no draft dependency
+- **Draft recovery:** Auto-save for recovery only; 24h retention; discarded after successful submit
 - **Job discovery:** HuggingFace datasets; keyword filter and user keywords fallback
 - **Knowledge base:** Document status badges, user-friendly error messages
 - **Session & analytics:** Re-enabled after URL fix (T003)

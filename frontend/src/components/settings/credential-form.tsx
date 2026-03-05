@@ -8,7 +8,15 @@
 
 import { useState, useEffect } from 'react'
 import { useCredentials, useUpsertCredential } from '@/hooks/useSettings'
-import type { CredentialUpsert, PlatformPlatform } from '@/types/settings'
+import type { CredentialUpsert, Platform } from '@/types/settings'
+
+/** Form state extends CredentialUpsert with edit-specific fields */
+interface CredentialFormData extends CredentialUpsert {
+  id?: string | null
+  is_active?: boolean
+  api_key?: string
+  api_secret?: string
+}
 
 interface CredentialFormProps {
   credentialId: string | null
@@ -22,7 +30,7 @@ export function CredentialForm({ credentialId, onClose, onSuccess }: CredentialF
   const credential = credentials.find(c => c.id === credentialId)
   const upsertMutation = useUpsertCredential()
 
-  const [formData, setFormData] = useState<CredentialUpsert>({
+  const [formData, setFormData] = useState<CredentialFormData>({
     id: null,
     platform: 'upwork',
     api_key: '',
@@ -31,14 +39,14 @@ export function CredentialForm({ credentialId, onClose, onSuccess }: CredentialF
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  // Load credential data when editing
+  // Load credential data when editing (api_key/api_secret not returned for security)
   useEffect(() => {
     if (credential) {
       setFormData({
         id: credential.id,
         platform: credential.platform,
-        api_key: credential.api_key,
-        api_secret: credential.api_secret || '',
+        api_key: '',
+        api_secret: '',
         is_active: credential.is_active,
       })
     }
@@ -47,7 +55,7 @@ export function CredentialForm({ credentialId, onClose, onSuccess }: CredentialF
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {}
 
-    if (!formData.api_key.trim()) {
+    if (!(formData.api_key ?? '').trim()) {
       newErrors.api_key = 'API key is required'
     }
 
@@ -62,8 +70,16 @@ export function CredentialForm({ credentialId, onClose, onSuccess }: CredentialF
       return
     }
 
+    const toSubmit: CredentialUpsert = {
+      platform: formData.platform,
+      api_key: formData.api_key,
+      api_secret: formData.api_secret,
+      access_token: formData.access_token,
+      refresh_token: formData.refresh_token,
+    }
+
     try {
-      await upsertMutation.mutateAsync(formData)
+      await upsertMutation.mutateAsync(toSubmit)
       onSuccess()
     } catch (error: any) {
       console.error('Error saving credential:', error)
@@ -72,8 +88,8 @@ export function CredentialForm({ credentialId, onClose, onSuccess }: CredentialF
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="w-full max-w-lg rounded-lg border border-slate-200 bg-white p-6 shadow-lg dark:border-slate-800 dark:bg-slate-900">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
+      <div className="w-full max-w-lg rounded-lg border border-slate-200 bg-white p-4 sm:p-6 shadow-lg dark:border-slate-800 dark:bg-slate-900 max-h-[90vh] overflow-y-auto my-auto">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-xl font-semibold">
             {isEditing ? 'Edit Credential' : 'Add Credential'}
@@ -94,7 +110,7 @@ export function CredentialForm({ credentialId, onClose, onSuccess }: CredentialF
             <select
               id="platform"
               value={formData.platform}
-              onChange={(e) => setFormData({ ...formData, platform: e.target.value as PlatformPlatform })}
+              onChange={(e) => setFormData({ ...formData, platform: e.target.value as Platform })}
               className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
               disabled={isEditing}
             >

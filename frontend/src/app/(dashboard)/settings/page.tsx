@@ -16,8 +16,13 @@ import {
 import { PreferencesForm } from '@/components/settings/preferences-form'
 import { CredentialsList } from '@/components/settings/credentials-list'
 import { CredentialForm } from '@/components/settings/credential-form'
+import { PageHeader } from '@/components/shared/page-header'
+import { PageContainer } from '@/components/shared/page-container'
+import { useToast } from '@/lib/toast/toast-context'
+import { Button } from '@/components/ui/button'
 
 export default function SettingsPage() {
+  const toast = useToast()
   const [showCredentialForm, setShowCredentialForm] = useState(false)
   const [editingCredential, setEditingCredential] = useState<string | null>(null)
 
@@ -53,34 +58,35 @@ export default function SettingsPage() {
   const handleVerify = async (credentialId: string) => {
     try {
       const result = await verifyCredentialMutation.mutateAsync(credentialId)
-      if (result?.verified) {
-        alert('Credential verified successfully!')
+      if (result?.is_valid) {
+        toast.success('Credential verified successfully!')
       } else {
-        alert(`Verification failed: ${result?.message || 'Unknown error'}`)
+        toast.error(result?.error || 'Verification failed')
       }
-    } catch (error) {
-      console.error('Error verifying credential:', error)
-      alert('Failed to verify credential')
+    } catch (err) {
+      console.error('Error verifying credential:', err)
+      toast.error(err)
     }
   }
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
-        <h1 className="text-3xl font-bold">Settings</h1>
+      <PageContainer>
+        <PageHeader
+          title="Settings"
+          description="Manage your preferences and platform credentials"
+        />
         <LoadingSkeleton lines={5} />
-      </div>
+      </PageContainer>
     )
   }
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold">Settings</h1>
-        <p className="text-muted-foreground mt-2">
-          Manage your preferences and platform credentials
-        </p>
-      </div>
+    <PageContainer className="space-y-8">
+      <PageHeader
+        title="Settings"
+        description="Manage your preferences and platform credentials"
+      />
 
       {/* Preferences Section */}
       <section className="rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
@@ -91,12 +97,7 @@ export default function SettingsPage() {
       <section className="rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-xl font-semibold">Platform Credentials</h2>
-          <button
-            onClick={handleCreate}
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            Add Credential
-          </button>
+          <Button onClick={handleCreate}>Add Credential</Button>
         </div>
 
         {/* Error Display */}
@@ -132,6 +133,6 @@ export default function SettingsPage() {
           }}
         />
       )}
-    </div>
+    </PageContainer>
   )
 }

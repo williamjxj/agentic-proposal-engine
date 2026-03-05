@@ -22,10 +22,11 @@ interface WorkflowDB extends DBSchema {
     }
   }
   'drafts-cache': {
-    key: string
+    key: string  // Composite key as string: "entityType:entityId"
     value: {
+      id: string  // Same as key for keyPath
       entityType: string
-      entityId: string  // Changed from string | null to string (we normalize null to 'new')
+      entityId: string
       draftData: Record<string, any>
       cachedAt: string
     }
@@ -41,16 +42,18 @@ let db: IDBPDatabase<WorkflowDB> | null = null
 async function initDB(): Promise<IDBPDatabase<WorkflowDB>> {
   if (db) return db
 
-  db = await openDB<WorkflowDB>('workflow-db', 1, {
-    upgrade(db) {
+  db = await openDB<WorkflowDB>('workflow-db', 2, {
+    upgrade(db, oldVersion) {
       // Create offline queue store
       if (!db.objectStoreNames.contains('offline-queue')) {
         db.createObjectStore('offline-queue', { keyPath: 'id' })
       }
-      
-      // Create drafts cache store
+      // Migrate drafts-cache from composite key (v1) to single id key (v2)
+      if (oldVersion < 2 && db.objectStoreNames.contains('drafts-cache')) {
+        db.deleteObjectStore('drafts-cache')
+      }
       if (!db.objectStoreNames.contains('drafts-cache')) {
-        db.createObjectStore('drafts-cache', { keyPath: ['entityType', 'entityId'] })
+        db.createObjectStore('drafts-cache', { keyPath: 'id' })
       }
     },
   })
@@ -223,7 +226,9 @@ export const DraftCache = {
       const database = await initDB()
       // Use 'new' for null entityId to avoid IndexedDB invalid key error
       const normalizedEntityId = entityId ?? 'new'
+      const id = `${entityType}:${normalizedEntityId}`
       await database.put('drafts-cache', {
+        id,
         entityType,
         entityId: normalizedEntityId,
         draftData,
@@ -243,9 +248,8 @@ export const DraftCache = {
   ): Promise<Record<string, any> | null> {
     try {
       const database = await initDB()
-      // Use 'new' as key for null entityId to avoid IndexedDB invalid key error
-      const key = [entityType, entityId ?? 'new']
-      const cached = await database.get('drafts-cache', key)
+      const id = `${entityType}:${entityId ?? 'new'}`
+      const cached = await database.get('drafts-cache', id)
       return cached?.draftData || null
     } catch (error) {
       console.error('Error reading cached draft:', error)
@@ -259,9 +263,8 @@ export const DraftCache = {
   async remove(entityType: string, entityId: string | null): Promise<void> {
     try {
       const database = await initDB()
-      // Use 'new' as key for null entityId to avoid IndexedDB invalid key error
-      const key = [entityType, entityId ?? 'new']
-      await database.delete('drafts-cache', key)
+      const id = `${entityType}:${entityId ?? 'new'}`
+      await database.delete('drafts-cache', id)
     } catch (error) {
       console.error('Error removing cached draft:', error)
     }

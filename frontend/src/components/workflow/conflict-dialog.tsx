@@ -73,7 +73,7 @@ export function ConflictDialog({
                   )}
                 </div>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Overwrite the server version with your local changes. This is the "last-write-wins" approach.
+                  Overwrite the server version with your local changes. This is the &quot;last-write-wins&quot; approach.
                 </p>
               </div>
             </div>
@@ -100,7 +100,7 @@ export function ConflictDialog({
                   )}
                 </div>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Discard your local changes and use the server's version. Your recent edits will be lost.
+                  Discard your local changes and use the server&apos;s version. Your recent edits will be lost.
                 </p>
               </div>
             </div>

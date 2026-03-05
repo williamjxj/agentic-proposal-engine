@@ -16,9 +16,16 @@ import {
   useDeleteDocument,
   useReprocessDocument,
 } from '@/hooks/useKnowledgeBase'
-import type { DocumentFilters } from '@/types/knowledge-base'
+import type {
+  DocumentFilters,
+  DocumentCollection,
+  ProcessingStatus,
+} from '@/types/knowledge-base'
 import { DocumentList } from '@/components/knowledge-base/document-list'
 import { DocumentUpload } from '@/components/knowledge-base/document-upload'
+import { PageHeader } from '@/components/shared/page-header'
+import { PageContainer } from '@/components/shared/page-container'
+import { Button } from '@/components/ui/button'
 
 export default function KnowledgeBasePage() {
   const { getFilters, setFilters, getScrollPosition, setScrollPosition } = useSessionState()
@@ -30,7 +37,7 @@ export default function KnowledgeBasePage() {
   const savedFilters = getFilters<DocumentFilters>()
   const [filters, setLocalFilters] = useState<DocumentFilters>({
     collection: savedFilters.collection,
-    status: savedFilters.status,
+    processing_status: savedFilters.processing_status,
   })
 
   // Load documents with filters
@@ -111,29 +118,24 @@ export default function KnowledgeBasePage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
-        <h1 className="text-3xl font-bold">Knowledge Base</h1>
+      <PageContainer>
+        <PageHeader
+          title="Knowledge Base"
+          description="Upload and manage documents for AI-powered proposal generation"
+        />
         <LoadingSkeleton lines={5} />
-      </div>
+      </PageContainer>
     )
   }
 
   return (
-    <div className="space-y-6" ref={scrollContainerRef}>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Knowledge Base</h1>
-          <p className="text-muted-foreground mt-2">
-            Upload and manage documents for AI-powered proposal generation
-          </p>
-        </div>
-        <button
-          onClick={() => setShowUpload(true)}
-          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-        >
-          Upload Document
-        </button>
-      </div>
+    <PageContainer ref={scrollContainerRef} className="space-y-6">
+      <PageHeader
+        title="Knowledge Base"
+        description="Upload and manage documents for AI-powered proposal generation"
+      >
+        <Button onClick={() => setShowUpload(true)}>Upload Document</Button>
+      </PageHeader>
 
       {/* Filters */}
       <div className="flex items-center gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900">
@@ -147,7 +149,7 @@ export default function KnowledgeBasePage() {
             onChange={(e) =>
               setLocalFilters({
                 ...filters,
-                collection: e.target.value || undefined,
+                collection: (e.target.value || undefined) as DocumentCollection | undefined,
               })
             }
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
@@ -165,11 +167,11 @@ export default function KnowledgeBasePage() {
           </label>
           <select
             id="status-filter"
-            value={filters.status || ''}
+            value={filters.processing_status || ''}
             onChange={(e) =>
               setLocalFilters({
                 ...filters,
-                status: e.target.value || undefined,
+                processing_status: (e.target.value || undefined) as ProcessingStatus | undefined,
               })
             }
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
@@ -207,6 +209,6 @@ export default function KnowledgeBasePage() {
       {showUpload && (
         <DocumentUpload onSuccess={handleUploadSuccess} onClose={() => setShowUpload(false)} />
       )}
-    </div>
+    </PageContainer>
   )
 }

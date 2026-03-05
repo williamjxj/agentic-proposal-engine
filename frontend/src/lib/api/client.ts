@@ -277,10 +277,11 @@ export async function saveDraft(
   draftRequest: DraftSaveRequest
 ): Promise<DraftWork | null> {
   const backend = getBackendUrl()
-  const { data } = await apiClient.put<DraftWork>(
+  const { data, error } = await apiClient.put<DraftWork>(
     `${backend}/api/drafts/${entityType}/${entityId}`,
     draftRequest
   )
+  if (error) throw new Error(error)
   return data
 }
 
@@ -616,7 +617,11 @@ export async function getProposal(proposalId: string): Promise<any | null> {
 
 export async function createProposal(proposalData: any): Promise<any | null> {
   const backend = getBackendUrl()
-  const { data } = await apiClient.post<any>(`${backend}/api/proposals`, proposalData)
+  const { data, error } = await apiClient.post<any>(
+    `${backend}/api/proposals`,
+    proposalData
+  )
+  if (error) throw new Error(error)
   return data
 }
 
@@ -625,9 +630,10 @@ export async function submitProposalFromDraft(
   entityId: string
 ): Promise<any | null> {
   const backend = getBackendUrl()
-  const { data } = await apiClient.post<any>(
+  const { data, error } = await apiClient.post<any>(
     `${backend}/api/proposals/from-draft/${entityType}/${entityId}`
   )
+  if (error) throw new Error(error)
   return data
 }
 

@@ -8,7 +8,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { useSessionState } from '@/hooks/useSessionState'
 
 /**
@@ -16,8 +16,7 @@ import { useSessionState } from '@/hooks/useSessionState'
  */
 export function BrowserNavigationHandler() {
   const pathname = usePathname()
-  const router = useRouter()
-  const { updateNavigation, getNavigationHistory } = useSessionState()
+  const { updateNavigation } = useSessionState()
 
   useEffect(() => {
     // Handle browser back/forward buttons
@@ -43,7 +42,7 @@ export function BrowserNavigationHandler() {
 
   // Handle beforeunload to warn about unsaved changes
   useEffect(() => {
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+    const handleBeforeUnload = (_event: BeforeUnloadEvent) => {
       // Check if there are unsaved changes (will be implemented in Phase 4 with auto-save)
       // For now, we don't prevent navigation
       

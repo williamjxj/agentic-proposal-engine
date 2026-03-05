@@ -109,10 +109,10 @@ graph TB
 - Present to user for review
 
 ### 6. Finalization
-- User can edit generated content in rich text editor
-- Save multiple draft versions
-- Export to PDF/DOCX format
-- Submit directly to platform (future feature)
+- User can edit generated content in the proposal form
+- Drafts auto-save in background for recovery (24h retention)
+- Submit creates proposal directly from form data (`POST /api/proposals`)
+- Export to PDF/DOCX format (future feature)
 
 ## Key Technologies
 

@@ -1,6 +1,7 @@
 /**
  * Login Page - User Authentication
- * Allows users to sign in with email/password
+ * Allows users to sign in with email/password.
+ * Includes "Try as demo user" for first-time visitors.
  */
 
 'use client'
@@ -9,6 +10,10 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
+import { demoUserConfig } from '@/lib/config/demo-user'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -31,7 +36,30 @@ export default function LoginPage() {
       } else {
         router.push('/dashboard')
       }
-    } catch (err) {
+    } catch (_err) {
+      setError('An unexpected error occurred')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDemoLogin = async () => {
+    if (!demoUserConfig.isAvailable) return
+    setError(null)
+    setLoading(true)
+
+    try {
+      const { error: signInError } = await signIn(
+        demoUserConfig.email,
+        demoUserConfig.password
+      )
+
+      if (signInError) {
+        setError(signInError.message)
+      } else {
+        router.push('/dashboard')
+      }
+    } catch (_err) {
       setError('An unexpected error occurred')
     } finally {
       setLoading(false)
@@ -57,10 +85,8 @@ export default function LoginPage() {
 
           <div className="space-y-4 rounded-lg border bg-card p-8 shadow-sm">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium">
-                Email address
-              </label>
-              <input
+              <Label htmlFor="email">Email address</Label>
+              <Input
                 id="email"
                 name="email"
                 type="email"
@@ -68,16 +94,14 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 placeholder="you@example.com"
+                className="mt-2"
               />
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium">
-                Password
-              </label>
-              <input
+              <Label htmlFor="password">Password</Label>
+              <Input
                 id="password"
                 name="password"
                 type="password"
@@ -85,22 +109,43 @@ export default function LoginPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 placeholder="••••••••"
+                className="mt-2"
               />
             </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            >
+            <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Signing in...' : 'Sign in'}
-            </button>
+            </Button>
+
+            {demoUserConfig.isAvailable && (
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-card px-2 text-muted-foreground">
+                    Or try first
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {demoUserConfig.isAvailable && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={handleDemoLogin}
+                disabled={loading}
+              >
+                Try as demo user ({demoUserConfig.email})
+              </Button>
+            )}
           </div>
 
           <p className="text-center text-sm text-muted-foreground">
-            Don't have an account?{' '}
+            Don&apos;t have an account?{' '}
             <Link
               href="/signup"
               className="font-medium text-primary hover:text-primary/90"
