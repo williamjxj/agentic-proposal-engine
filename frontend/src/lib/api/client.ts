@@ -328,6 +328,31 @@ export async function recordWorkflowEvent(
   await apiClient.post(url, event)
 }
 
+export interface ProposalAnalytics {
+  proposal_trends: { date: string; count: number; submitted: number }[]
+  acceptance_over_time: { date: string; accepted: number; total: number; rate: number }[]
+  revenue_over_time: { period: string; revenue: number }[]
+  platform_performance: { platform: string; count: number; accepted: number; rate: number }[]
+}
+
+const EMPTY_ANALYTICS: ProposalAnalytics = {
+  proposal_trends: [],
+  acceptance_over_time: [],
+  revenue_over_time: [],
+  platform_performance: [],
+}
+
+export async function getProposalAnalytics(
+  timeRange: string = '7d'
+): Promise<ProposalAnalytics> {
+  const backend = getBackendUrl()
+  const { data, error } = await apiClient.get<ProposalAnalytics>(
+    `${backend}/api/analytics/proposals-stats?time_range=${encodeURIComponent(timeRange)}`
+  )
+  if (error) throw new Error(error)
+  return data ?? EMPTY_ANALYTICS
+}
+
 // UI Routers Improvement API Functions
 
 import type {

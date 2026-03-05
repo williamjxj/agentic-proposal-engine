@@ -7,7 +7,7 @@ Records user workflow events for performance monitoring and optimization.
 
 from typing import Optional
 import logging
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, Query, status
 
 from app.models.analytics import (
     WorkflowAnalyticsEventCreate,
@@ -156,4 +156,31 @@ async def get_workflow_metrics(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to get workflow metrics",
+        )
+
+
+@router.get(
+    "/analytics/proposals-stats",
+    status_code=status.HTTP_200_OK,
+    summary="Get proposal analytics for charts",
+    description="Proposal trends, acceptance rates, revenue, platform performance",
+)
+async def get_proposal_analytics(
+    time_range: str = Query("7d", description="24h, 7d, 30d, 90d"),
+    current_user: UserResponse = Depends(get_current_user),
+) -> dict:
+    """Get aggregated proposal analytics for dashboard charts."""
+    try:
+        from app.services.proposal_analytics_service import get_proposal_analytics as fetch_stats
+        from uuid import UUID
+        uid = current_user.id
+        user_uuid = uid if isinstance(uid, UUID) else UUID(str(uid))
+        return await fetch_stats(user_uuid, time_range)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting proposal analytics: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get proposal analytics",
         )
