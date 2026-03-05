@@ -2,8 +2,9 @@
 from typing import List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
+from app.core.errors import RateLimitError
 from app.models.proposal import (
     Proposal,
     ProposalCreate,
@@ -13,7 +14,9 @@ from app.models.proposal import (
 )
 from app.routers.auth import get_current_user
 from app.services import proposal_service
+from app.services.ai_service import ai_service
 from app.models.auth import UserResponse
+from app.models.ai import ProposalGenerateRequest, GeneratedProposal
 
 router = APIRouter(prefix="/api/proposals", tags=["proposals"])
 
@@ -60,6 +63,28 @@ async def create_proposal(
     user_id = current_user.id
     proposal = await proposal_service.create_proposal(user_id, proposal_data)
     return proposal
+
+
+@router.post("/generate-from-job", response_model=GeneratedProposal)
+async def generate_proposal_from_job(
+    request: ProposalGenerateRequest,
+    response: Response,
+    current_user: UserResponse = Depends(get_current_user),
+):
+    """
+    Generate an AI-powered proposal using RAG and a selected strategy.
+    
+    This is the core agentic workflow. Returns 429 if another generation is in progress (FR-010).
+    """
+    try:
+        user_id = current_user.id
+        return await ai_service.generate_proposal(user_id, request)
+    except RateLimitError as e:
+        retry_after = 30
+        if e.details and isinstance(e.details, dict):
+            retry_after = e.details.get("retry_after_seconds", 30)
+        response.headers["Retry-After"] = str(retry_after)
+        raise HTTPException(status_code=429, detail=e.message)
 
 
 @router.post("/from-draft/{entity_type}/{entity_id}", response_model=Proposal, status_code=201)

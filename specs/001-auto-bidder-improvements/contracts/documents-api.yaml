@@ -1,0 +1,67 @@
+# API Contract: Knowledge Base Documents (001-auto-bidder-improvements)
+# FR-008, FR-009: Ingestion status, error feedback
+
+openapi: 3.0.3
+info:
+  title: Auto-Bidder Documents API
+  version: 1.0.0
+
+paths:
+  /api/documents:
+    get:
+      summary: List documents (includes processing_status - FR-008)
+      operationId: listDocuments
+      tags: [knowledge-base]
+      parameters:
+        - name: collection
+          in: query
+          schema:
+            type: string
+            enum: [case_studies, team_profiles, portfolio, other]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, processing, ready, failed]
+      responses:
+        '200':
+          description: Document list with status
+
+  /api/documents/{document_id}:
+    get:
+      summary: Get document (status, error_message - FR-009)
+      operationId: getDocument
+      tags: [knowledge-base]
+      responses:
+        '200':
+          description: Document with processing_status, processing_error
+  /api/documents/upload:
+    post:
+      summary: Upload document (FR-008)
+      operationId: uploadDocument
+      tags: [knowledge-base]
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                collection:
+                  type: string
+                  enum: [case_studies, team_profiles, portfolio, other]
+      responses:
+        '201':
+          description: Created - processing_status initially "pending" or "processing"
+        '400':
+          description: Invalid file or collection
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    description: User-friendly error with suggestion (FR-009)

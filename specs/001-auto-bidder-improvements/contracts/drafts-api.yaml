@@ -1,0 +1,82 @@
+# API Contract: Drafts (001-auto-bidder-improvements)
+# FR-004, FR-005, FR-006: Auto-save, recovery, conflict resolution
+
+openapi: 3.0.3
+info:
+  title: Auto-Bidder Drafts API
+  version: 1.0.0
+
+paths:
+  /api/drafts:
+    get:
+      summary: List drafts (recovery - FR-005)
+      operationId: listDrafts
+      tags: [drafts]
+      parameters:
+        - name: entity_type
+          in: query
+          schema:
+            type: string
+            example: proposal
+      responses:
+        '200':
+          description: Draft list with version info
+
+  /api/drafts/{entity_type}/{entity_id}:
+    get:
+      summary: Get draft (recovery)
+      operationId: getDraft
+      tags: [drafts]
+      parameters:
+        - name: entity_type
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: entity_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Draft with version
+        '404':
+          description: Not found
+    put:
+      summary: Save draft (FR-004, conflict - FR-006)
+      operationId: saveDraft
+      tags: [drafts]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [draft_data, version]
+              properties:
+                draft_data:
+                  type: object
+                version:
+                  type: integer
+                  minimum: 1
+      responses:
+        '200':
+          description: Saved
+        '409':
+          description: Version conflict - user must resolve (FR-006)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  conflict:
+                    type: object
+                    properties:
+                      server_version:
+                        type: integer
+                      client_version:
+                        type: integer
+                  server_draft:
+                    type: object

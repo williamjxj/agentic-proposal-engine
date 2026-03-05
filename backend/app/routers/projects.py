@@ -30,6 +30,7 @@ from ..models.project import (
     ProjectStats
 )
 from ..services.hf_job_source import fetch_hf_jobs, get_available_datasets
+from ..services.keyword_service import keyword_service
 
 logger = logging.getLogger(__name__)
 
@@ -67,15 +68,27 @@ async def discover_projects(
             "max_results": 20
         }
     """
-    logger.info(f"User {user_id} discovering projects with keywords: {request.keywords}")
-    
+    # FR-007: Use request keywords, or fall back to user's saved keywords
+    keywords = request.keywords
+    if not keywords:
+        try:
+            user_keywords = await keyword_service.list_keywords(
+                str(current_user.id), search=None, is_active=True
+            )
+            keywords = [k.keyword for k in user_keywords] if user_keywords else None
+        except Exception as e:
+            logger.debug(f"Could not load user keywords: {e}")
+            keywords = None
+
+    logger.info(f"User {current_user.id} discovering projects with keywords: {keywords}")
+
     if USE_HF_DATASET:
         # Development mode: load from HuggingFace
         try:
             jobs = fetch_hf_jobs(
                 dataset_id=HF_DATASET_ID,
                 limit=min(request.max_results, HF_JOB_LIMIT),
-                keyword_filter=request.keywords if request.keywords else None
+                keyword_filter=keywords
             )
             
             logger.info(f"Loaded {len(jobs)} jobs from HuggingFace dataset")

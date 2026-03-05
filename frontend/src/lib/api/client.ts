@@ -191,7 +191,8 @@ import type {
 
 /**
  * Get backend API URL from environment
- * Returns a properly formatted absolute URL
+ * Returns a properly formatted absolute URL.
+ * Prevents malformed URLs (e.g. /apihttp:/localhost) that cause infinite loops.
  */
 function getBackendUrl(): string {
   const url = process.env.NEXT_PUBLIC_BACKEND_API_URL || 'http://localhost:8000'
@@ -199,9 +200,14 @@ function getBackendUrl(): string {
   // Normalize: remove trailing slashes and trim
   let cleanUrl = url.trim().replace(/\/+$/, '')
 
-  // Ensure protocol
+  // Ensure protocol - must start with http:// or https://
   if (!/^https?:\/\//i.test(cleanUrl)) {
-    cleanUrl = `http://${cleanUrl.replace(/^\/+/, '')}`
+    cleanUrl = `http://${cleanUrl.replace(/^\/+/, '').replace(/^api\/?/, '')}`
+  }
+
+  // Reject malformed patterns (e.g. apihttp:/, /apihttp:)
+  if (/\/?apihttps?:/i.test(cleanUrl) || cleanUrl.includes('apihttp')) {
+    return 'http://localhost:8000'
   }
 
   return cleanUrl
@@ -617,6 +623,39 @@ export async function getProposal(proposalId: string): Promise<any | null> {
 export async function createProposal(proposalData: any): Promise<any | null> {
   const backend = getBackendUrl()
   const { data } = await apiClient.post<any>(`${backend}/api/proposals`, proposalData)
+  return data
+}
+
+export interface ProposalGenerateRequest {
+  job_id?: string
+  job_title: string
+  job_description: string
+  job_skills?: string[]
+  strategy_id?: string
+  extra_context?: string
+  custom_instructions?: string
+}
+
+export interface GeneratedProposal {
+  title: string
+  description: string
+  budget?: string
+  timeline?: string
+  skills?: string[]
+  ai_model?: string
+  strategy_id?: string
+  confidence_score?: number
+}
+
+export async function generateProposalFromJob(
+  request: ProposalGenerateRequest
+): Promise<GeneratedProposal | null> {
+  const backend = getBackendUrl()
+  const { data, error } = await apiClient.post<GeneratedProposal>(
+    `${backend}/api/proposals/generate-from-job`,
+    request
+  )
+  if (error) throw new Error(error)
   return data
 }
 

@@ -17,6 +17,7 @@ import {
   listProjects,
   getProjectStats,
   getAvailableDatasets,
+  listKeywords,
   type Project,
   type ProjectStats,
   type DatasetInfo,
@@ -119,6 +120,19 @@ export default function ProjectsPage() {
     setFilters(filters)
   }, [filters, setFilters])
 
+  // T019/T020: Pre-fill discover keywords from user's saved keywords when opening dialog
+  useEffect(() => {
+    if (showDiscoverDialog && !discoverKeywords) {
+      listKeywords()
+        .then((keywords) => {
+          if (keywords?.length) {
+            setDiscoverKeywords(keywords.map((k) => k.keyword).join(', '))
+          }
+        })
+        .catch(() => {})
+    }
+  }, [showDiscoverDialog])
+
   const handleSearch = async () => {
     setIsLoading(true)
     try {
@@ -134,14 +148,12 @@ export default function ProjectsPage() {
   }
 
   const handleDiscoverJobs = async () => {
-    if (!discoverKeywords.trim()) {
-      alert('Please enter keywords to search')
-      return
-    }
-
     setIsDiscovering(true)
     try {
-      const keywords = discoverKeywords.split(',').map((k) => k.trim()).filter(Boolean)
+      // Keywords from input, or empty (backend uses user's saved keywords when empty)
+      const keywords = discoverKeywords.trim()
+        ? discoverKeywords.split(',').map((k) => k.trim()).filter(Boolean)
+        : []
       const result = await discoverProjects({
         keywords,
         max_results: 50,
@@ -152,7 +164,7 @@ export default function ProjectsPage() {
         setProjects(result.jobs)
         setShowDiscoverDialog(false)
         setDiscoverKeywords('')
-        alert(`Discovered ${result.total} jobs from ${result.dataset_used}`)
+        alert(`Discovered ${result.count ?? result.total ?? result.jobs?.length ?? 0} jobs from ${result.dataset_id ?? result.dataset_used ?? 'dataset'}`)
       }
     } catch (error) {
       console.error('Failed to discover jobs:', error)
@@ -249,13 +261,19 @@ export default function ProjectsPage() {
             </button>
           </div>
         ) : (
-          projects.map((project) => (
-            <ProjectCard
-              key={project.id}
-              project={project}
-              onClick={() => handleProjectClick(project.id)}
-            />
-          ))
+          projects.map((project, index) => {
+            const projectId =
+              project.id ??
+              (project as { external_id?: string }).external_id ??
+              `project-${index}`
+            return (
+              <ProjectCard
+                key={projectId}
+                project={project}
+                onClick={() => handleProjectClick(projectId)}
+              />
+            )
+          })
         )}
       </div>
 
@@ -298,10 +316,13 @@ function ProjectCard({
 
   const handleGenerateProposal = (e: React.MouseEvent) => {
     e.stopPropagation() // Prevent card click
-    
-    // Navigate to new proposal page with job data as query params
+
+    const projectId =
+      project.id ??
+      (project as { external_id?: string }).external_id ??
+      ''
     const params = new URLSearchParams({
-      jobId: project.id,
+      jobId: projectId,
       jobTitle: project.title,
       jobCompany: project.company,
       jobDescription: project.description,
@@ -346,7 +367,10 @@ function ProjectCard({
             </span>
           ))}
           {project.skills.length > 5 && (
-            <span className="rounded-md bg-slate-100 px-2 py-1 text-xs dark:bg-slate-800">
+            <span
+              key="more-skills"
+              className="rounded-md bg-slate-100 px-2 py-1 text-xs dark:bg-slate-800"
+            >
               +{project.skills.length - 5} more
             </span>
           )}

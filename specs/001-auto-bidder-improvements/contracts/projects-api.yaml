@@ -1,0 +1,51 @@
+# API Contract: Projects / Job Discovery (001-auto-bidder-improvements)
+# FR-007, SC-005: Keyword filtering
+
+openapi: 3.0.3
+info:
+  title: Auto-Bidder Projects API
+  version: 1.0.0
+  description: Job discovery and filtering
+
+paths:
+  /api/projects/discover:
+    post:
+      summary: Discover jobs with keyword filter (FR-007)
+      operationId: discoverProjects
+      tags: [projects]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                keywords:
+                  type: array
+                  items:
+                    type: string
+                  description: User keywords/skills for filtering
+                max_results:
+                  type: integer
+                  default: 50
+                dataset_id:
+                  type: string
+      responses:
+        '200':
+          description: Jobs matching keywords (SC-005: ~70% match when keywords set)
+
+  /api/projects/list:
+    get:
+      summary: List discovered jobs
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Job list

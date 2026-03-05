@@ -593,10 +593,10 @@ describe('Proposal Workflow Integration', () => {
 - Visual feedback: YES
 - Error handling: YES
 
-⏳ **Pending (Next Sprint)**
-- RAG API integration: NO (foundation ready)
-- Real AI generation: NO (placeholder working)
-- Knowledge base search: NO (service exists)
+✅ **AI Generate Wiring (Implemented 2025-03-04)**
+- RAG API integration: YES - calls POST /api/proposals/generate-from-job
+- Real AI generation: YES - uses ai_service with RAG + strategy
+- Knowledge base search: YES - vector_store similarity search
 
 ## Conclusion
 

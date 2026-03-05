@@ -11,6 +11,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAutoSave } from '@/hooks/useAutoSave'
+import { generateProposalFromJob } from '@/lib/api/client'
 import { useDraftRecovery } from '@/hooks/useDraftRecovery'
 import { AutoSaveIndicator, DraftRecoveryBanner } from '@/components/workflow/auto-save-indicator'
 import { LoadingSkeleton } from '@/components/workflow/progress-overlay'
@@ -46,6 +47,8 @@ export default function NewProposalPage() {
   const [isInitialized, setIsInitialized] = useState(false)
   const [jobContext, setJobContext] = useState<JobContext | null>(null)
   const [showJobContext, setShowJobContext] = useState(true)
+  const [isAIGenerating, setIsAIGenerating] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
 
   // Extract job data from query parameters
   useEffect(() => {
@@ -162,45 +165,44 @@ export default function NewProposalPage() {
     }
   }
 
-  // AI-assisted proposal generation
+  // AI-assisted proposal generation (RAG + strategy)
   const handleAIGenerate = async () => {
     if (!jobContext) {
-      alert('No job context available for AI generation')
+      setAiError('No job context available for AI generation')
       return
     }
 
+    setIsAIGenerating(true)
+    setAiError(null)
+
     try {
-      // TODO: Call backend API to generate proposal using RAG
-      // This should:
-      // 1. Send job description to knowledge base search
-      // 2. Retrieve relevant documents from user's portfolio
-      // 3. Use AI to generate customized proposal
-      // 4. Pre-fill the form with AI-generated content
-      
-      // For now, show a placeholder message
-      alert(
-        'AI Generation coming soon!\n\n' +
-        'This will use your knowledge base and the job description to:\n' +
-        '• Find relevant past work and skills\n' +
-        '• Generate a customized proposal\n' +
-        '• Suggest timeline and budget\n' +
-        '• Highlight your unique value proposition'
-      )
-      
-      // Placeholder: Pre-fill with AI-style content
-      setFormData((prev) => ({
-        ...prev,
-        description: prev.description + 
-          `\n\nBased on the job requirements for "${jobContext.title}", ` +
-          `I am confident I can deliver exceptional results. My expertise in ${jobContext.skills || 'relevant technologies'} ` +
-          `aligns perfectly with your needs.\n\n` +
-          `I have successfully completed similar projects for ${jobContext.company} ` +
-          `and understand the challenges in this domain. ` +
-          `I can provide a detailed project plan and timeline upon request.`,
-      }))
+      const generated = await generateProposalFromJob({
+        job_title: jobContext.title,
+        job_description: jobContext.description,
+        job_skills: jobContext.skills
+          ? jobContext.skills.split(',').map((s) => s.trim())
+          : undefined,
+      })
+
+      if (generated) {
+        setFormData((prev) => ({
+          ...prev,
+          title: generated.title,
+          description: generated.description,
+          budget: generated.budget || prev.budget,
+          timeline: generated.timeline || prev.timeline,
+          skills: generated.skills?.join(', ') || prev.skills,
+        }))
+      }
     } catch (error) {
-      console.error('Failed to generate AI proposal:', error)
-      alert('Failed to generate proposal. Please try again.')
+      const message =
+        error instanceof Error ? error.message : 'Failed to generate proposal'
+      setAiError(message)
+      if (message.includes('429') || message.includes('wait')) {
+        setAiError('Another proposal is being generated. Please wait and try again.')
+      }
+    } finally {
+      setIsAIGenerating(false)
     }
   }
 
@@ -321,12 +323,22 @@ export default function NewProposalPage() {
               <button
                 type="button"
                 onClick={handleAIGenerate}
-                className="text-sm text-primary hover:underline flex items-center gap-1"
+                disabled={isAIGenerating}
+                className="text-sm text-primary hover:underline flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                ✨ AI Generate
+                {isAIGenerating ? (
+                  <>⏳ Generating...</>
+                ) : (
+                  <>✨ AI Generate</>
+                )}
               </button>
             )}
           </div>
+          {aiError && (
+            <p className="text-sm text-destructive mb-2" role="alert">
+              {aiError}
+            </p>
+          )}
           <textarea
             id="description"
             value={formData.description}

@@ -81,11 +81,8 @@ export function useNavigationTiming() {
     }
   }, [hasPerformanceAPI])
 
-  // Send timing data to analytics
+  // Send timing data to analytics (re-enabled after URL construction fix)
   const recordNavigationTiming = useCallback(async (timing: NavigationTiming) => {
-    // TEMPORARILY DISABLED - API calls causing infinite loop
-    return
-    
     try {
       await recordWorkflowEvent({
         event_type: 'page_transition',

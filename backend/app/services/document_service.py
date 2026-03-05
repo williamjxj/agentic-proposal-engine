@@ -198,9 +198,10 @@ class DocumentService:
                 await self._process_document(document_id, user_id, file_content, file_type, collection)
             except Exception as e:
                 logger.error(f"Document processing failed: {e}")
-                # Update status to failed
+                # FR-009: Map to user-friendly error with suggestion
+                friendly_msg = self._get_friendly_error_message(e)
                 await self._update_document_status(
-                    document_id, "failed", str(e)
+                    document_id, "failed", friendly_msg
                 )
 
             return document
@@ -263,9 +264,11 @@ class DocumentService:
                 total_chars = sum(len(text) for text in chunk_texts)
                 token_count = total_chars // 4
 
+                # Map "other" to general_kb for RAG search compatibility (research.md)
+                chroma_collection = "general_kb" if collection == "other" else collection
                 # Store in ChromaDB (convert UUIDs to strings)
                 await vector_store.add_documents(
-                    collection_name=collection,
+                    collection_name=chroma_collection,
                     user_id=str(user_id),
                     document_id=str(document_id),
                     chunks=chunk_texts,
@@ -291,6 +294,26 @@ class DocumentService:
         except Exception as e:
             logger.error(f"Document processing error: {e}")
             raise
+
+    def _get_friendly_error_message(self, error: Exception) -> str:
+        """Map technical errors to user-friendly messages with suggestions (FR-009)."""
+        msg = str(error).lower()
+        if "pdf" in msg or "parse" in msg or "pypdf" in msg or "corrupt" in msg:
+            return (
+                "Unable to read this PDF. The file may be corrupted, password-protected, "
+                "or in an unsupported format. Try re-exporting as a new PDF or use a different file."
+            )
+        if "docx" in msg or "doc" in msg or "word" in msg:
+            return (
+                "Unable to read this Word document. The file may be corrupted or in an old format. "
+                "Try saving as .docx (Word 2007+) or exporting to PDF."
+            )
+        if "embedding" in msg or "encode" in msg:
+            return "Document processing failed during analysis. Please try again or use a smaller file."
+        if "timeout" in msg or "timed out" in msg:
+            return "Processing took too long. Try a smaller file or split your document."
+        # Default
+        return f"Processing failed: {str(error)[:200]}. Please check the file and try again."
 
     async def _update_document_status(
         self,

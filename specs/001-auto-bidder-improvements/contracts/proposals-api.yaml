@@ -1,0 +1,120 @@
+# API Contract: Proposals (001-auto-bidder-improvements)
+# Key endpoints for proposal generation and management
+
+openapi: 3.0.3
+info:
+  title: Auto-Bidder Proposals API
+  version: 1.0.0
+  description: Proposal CRUD and AI generation endpoints
+
+paths:
+  /api/proposals/generate-from-job:
+    post:
+      summary: Generate AI proposal from job (FR-001, FR-002, FR-003)
+      operationId: generateProposalFromJob
+      tags: [proposals]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProposalGenerateRequest'
+      responses:
+        '200':
+          description: Generated proposal
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GeneratedProposal'
+        '401':
+          description: Unauthorized
+        '429':
+          description: Too many requests - generation already in progress (FR-010)
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+                example: 30
+
+  /api/proposals:
+    get:
+      summary: List proposals
+      operationId: listProposals
+      tags: [proposals]
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Proposal list
+    post:
+      summary: Create proposal
+      operationId: createProposal
+      tags: [proposals]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProposalCreate'
+      responses:
+        '201':
+          description: Created
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    ProposalGenerateRequest:
+      type: object
+      required: [job_title, job_description]
+      properties:
+        job_id:
+          type: string
+          format: uuid
+        job_title:
+          type: string
+        job_description:
+          type: string
+        job_skills:
+          type: array
+          items:
+            type: string
+        strategy_id:
+          type: string
+          format: uuid
+        extra_context:
+          type: string
+        custom_instructions:
+          type: string
+
+    GeneratedProposal:
+      type: object
+      required: [title, description, ai_model]
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        budget:
+          type: string
+        timeline:
+          type: string
+        skills:
+          type: array
+          items:
+            type: string
+        ai_model:
+          type: string
+        strategy_id:
+          type: string
+        confidence_score:
+          type: number
+          minimum: 0
+          maximum: 1
