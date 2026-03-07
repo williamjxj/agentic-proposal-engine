@@ -48,6 +48,8 @@ class Settings(BaseSettings):
     # Database and Storage Configuration
     database_url: Optional[str] = Field(None, alias="DATABASE_URL")
     chroma_persist_dir: str = Field(default="./chroma_db", alias="CHROMA_PERSIST_DIR")
+    chroma_host: Optional[str] = Field(None, alias="CHROMA_HOST")  # If set, uses HTTP client instead of local
+    chroma_port: int = Field(default=8000, alias="CHROMA_PORT")  # Docker ChromaDB runs on port 8000 internally
     data_dir: str = Field(default="data", alias="DATA_DIR")
     encryption_key: Optional[str] = Field(None, alias="ENCRYPTION_KEY")
 
@@ -97,7 +99,7 @@ class Settings(BaseSettings):
     def max_file_size_bytes(self) -> int:
         """Convert max file size from MB to bytes."""
         return self.max_file_size_mb * 1024 * 1024
-    
+
     @property
     def max_draft_size_bytes(self) -> int:
         """Convert max draft size from KB to bytes."""

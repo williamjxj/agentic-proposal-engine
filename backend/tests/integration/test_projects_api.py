@@ -15,6 +15,7 @@ from httpx import ASGITransport, AsyncClient
 from app.main import app
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_list_projects_unauthorized_returns_401() -> None:
     """Unauthenticated request to list_projects should return 401."""
@@ -26,6 +27,7 @@ async def test_list_projects_unauthorized_returns_401() -> None:
         assert response.status_code == 401
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 @pytest.mark.skipif(
     os.getenv("ETL_USE_PERSISTENCE", "false").lower() != "true",

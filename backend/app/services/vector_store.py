@@ -20,22 +20,56 @@ class VectorStoreService:
     """Service for managing vector embeddings in ChromaDB."""
 
     def __init__(self) -> None:
-        """Initialize ChromaDB client with persistent storage."""
+        """
+        Initialize ChromaDB client.
+
+        Supports two modes:
+        1. HTTP Client: If CHROMA_HOST is set, connects to Docker/remote ChromaDB
+        2. Persistent Client: Otherwise, uses local file-based storage
+
+        This hybrid approach allows:
+        - Development: Local file-based ChromaDB (simple, debuggable)
+        - Production: Containerized ChromaDB (scalable, isolated)
+        """
         try:
-            # Ensure persist directory exists
-            persist_path = Path(app_settings.chroma_persist_dir)
-            persist_path.mkdir(parents=True, exist_ok=True)
+            # Mode 1: HTTP Client (Docker/Remote ChromaDB)
+            if app_settings.chroma_host:
+                try:
+                    self.client = chromadb.HttpClient(
+                        host=app_settings.chroma_host,
+                        port=app_settings.chroma_port,
+                        settings=Settings(
+                            anonymized_telemetry=False,
+                        ),
+                    )
+                    logger.info(
+                        f"ChromaDB HTTP client connected to "
+                        f"{app_settings.chroma_host}:{app_settings.chroma_port}"
+                    )
+                    self.mode = "http"
+                except Exception as http_error:
+                    logger.warning(
+                        f"Failed to connect to Dockerized ChromaDB: {http_error}. "
+                        "Falling back to local persistent mode."
+                    )
+                    # Fall back to persistent mode
+                    app_settings.chroma_host = None
 
-            # Initialize ChromaDB client
-            self.client = chromadb.PersistentClient(
-                path=str(persist_path),
-                settings=Settings(
-                    anonymized_telemetry=False,
-                    allow_reset=True,
-                ),
-            )
+            # Mode 2: Persistent Client (Local File-Based)
+            if not app_settings.chroma_host:
+                persist_path = Path(app_settings.chroma_persist_dir)
+                persist_path.mkdir(parents=True, exist_ok=True)
 
-            logger.info(f"ChromaDB initialized at {persist_path}")
+                self.client = chromadb.PersistentClient(
+                    path=str(persist_path),
+                    settings=Settings(
+                        anonymized_telemetry=False,
+                        allow_reset=True,
+                    ),
+                )
+                logger.info(f"ChromaDB PersistentClient initialized at {persist_path}")
+                self.mode = "persistent"
+
         except Exception as e:
             logger.error(f"Failed to initialize ChromaDB: {e}")
             raise VectorStoreError(f"ChromaDB initialization failed: {e}")
@@ -112,7 +146,7 @@ class VectorStoreService:
             else:
                 # Ensure all metadata values are ChromaDB-compatible types
                 metadatas = [
-                    {k: str(v) if not isinstance(v, (str, int, float, bool)) else v 
+                    {k: str(v) if not isinstance(v, (str, int, float, bool)) else v
                      for k, v in metadata.items()}
                     for metadata in metadatas
                 ]

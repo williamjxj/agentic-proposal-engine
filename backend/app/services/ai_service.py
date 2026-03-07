@@ -14,8 +14,8 @@ import asyncio
 from uuid import UUID
 
 from langchain_openai import ChatOpenAI
-from langchain.prompts import ChatPromptTemplate
-from langchain.schema import SystemMessage, HumanMessage
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.messages import SystemMessage, HumanMessage
 
 from app.config import settings
 from app.services.vector_store import vector_store
