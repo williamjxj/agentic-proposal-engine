@@ -21,6 +21,7 @@ class ProposalBase(BaseModel):
     skills: List[str] = Field(default_factory=list, description="Required skills")
     
     # Job details
+    job_id: Optional[str] = Field(None, description="UUID of persisted job when created from Projects page (FR-010)")
     job_url: Optional[str] = Field(None, description="Original job posting URL")
     job_platform: Optional[str] = Field(None, max_length=100, description="Platform (Upwork, Freelancer)")
     client_name: Optional[str] = Field(None, max_length=255, description="Client name")
@@ -45,6 +46,7 @@ class ProposalUpdate(BaseModel):
     budget: Optional[str] = None
     timeline: Optional[str] = Field(None, max_length=200)
     skills: Optional[List[str]] = None
+    job_id: Optional[str] = None
     job_url: Optional[str] = None
     job_platform: Optional[str] = None
     client_name: Optional[str] = None
@@ -61,7 +63,8 @@ class Proposal(ProposalBase):
     
     id: str = Field(..., description="UUID primary key")
     user_id: str = Field(..., description="User UUID")
-    
+    job_id: Optional[str] = Field(None, description="Linked job UUID when created from Projects page")
+
     # Status fields
     status: str = Field(..., description="Proposal status")
     submitted_at: Optional[datetime] = Field(None, description="When submitted to client")

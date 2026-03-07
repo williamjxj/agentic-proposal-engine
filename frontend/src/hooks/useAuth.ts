@@ -18,7 +18,7 @@ interface AuthError {
 interface UseAuthReturn {
   user: User | null
   loading: boolean
-  signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>
+  signIn: (email: string, password: string, redirectPath?: string) => Promise<{ error: AuthError | null }>
   signUp: (email: string, password: string, fullName?: string) => Promise<{ error: AuthError | null }>
   signOut: () => Promise<void>
   refreshSession: () => Promise<void>
@@ -70,7 +70,7 @@ export function useAuth(): UseAuthReturn {
     loadUser()
   }, [loadUser])
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string, redirectPath?: string) => {
     try {
       const response = await authAPI.login(email, password)
       
@@ -81,8 +81,13 @@ export function useAuth(): UseAuthReturn {
       // Set user
       setUser(response.user)
       
-      // Redirect to dashboard
-      router.push('/dashboard')
+      // Redirect to requested path (e.g. after session expiry) or dashboard
+      // Only allow relative paths (block //evil.com open redirects)
+      const target =
+        redirectPath?.startsWith('/') && !redirectPath.startsWith('//')
+          ? redirectPath
+          : '/dashboard'
+      router.push(target)
       router.refresh()
       
       return { error: null }

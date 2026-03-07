@@ -77,6 +77,11 @@ class Settings(BaseSettings):
     chunk_size: int = Field(default=1000, alias="CHUNK_SIZE")
     chunk_overlap: int = Field(default=200, alias="CHUNK_OVERLAP")
 
+    # ETL / Job Persistence Configuration
+    etl_use_persistence: bool = Field(default=False, alias="ETL_USE_PERSISTENCE")
+    hf_etl_schedule_hours: int = Field(default=168, alias="HF_ETL_SCHEDULE_HOURS")  # 168 = weekly
+    freelancer_etl_schedule_hours: int = Field(default=24, alias="FREELANCER_ETL_SCHEDULE_HOURS")  # 24 = daily
+
     # Workflow Optimization Configuration
     session_state_ttl_hours: int = Field(default=24, alias="SESSION_STATE_TTL_HOURS")
     draft_retention_hours: int = Field(default=24, alias="DRAFT_RETENTION_HOURS")

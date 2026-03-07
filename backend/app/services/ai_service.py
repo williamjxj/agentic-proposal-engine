@@ -268,3 +268,20 @@ class AIService:
 
 # Singleton instance
 ai_service = AIService()
+
+
+async def generate_text(prompt: str) -> str:
+    """
+    Generate text from a single prompt using the configured LLM.
+    Useful for simple AI interactions like chatbot or summarization.
+    """
+    if not ai_service.chat_model:
+        logger.warning("generate_text called but AI chat_model is not configured")
+        return "LLM provider not configured. Please check your .env settings."
+    
+    try:
+        response = await ai_service.chat_model.ainvoke([HumanMessage(content=prompt)])
+        return response.content
+    except Exception as e:
+        logger.error(f"Error in generate_text: {e}")
+        return f"Sorry, I encountered an error while processing your request: {str(e)}"

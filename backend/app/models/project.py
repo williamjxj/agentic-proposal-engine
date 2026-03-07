@@ -59,15 +59,33 @@ class ProjectFilters(BaseModel):
     skills: Optional[List[str]] = Field(None, description="Filter by required skills")
     budget_min: Optional[float] = Field(None, description="Minimum budget filter")
     budget_max: Optional[float] = Field(None, description="Maximum budget filter")
-    search: Optional[str] = Field(None, description="Search in title/description")
+    search: Optional[str] = Field(None, description="Search in title/description (comma-separated keywords)")
+    category: Optional[str] = Field(None, description="Filter by project category")
+    start_date: Optional[datetime] = Field(None, description="Filter by start date")
+    end_date: Optional[datetime] = Field(None, description="Filter by end date")
+    applied: Optional[bool] = Field(None, description="Filter by applied status")
+    sort_by: Optional[str] = Field("date", description="Sort by: date, category")
+
+
+class ProjectListResponse(BaseModel):
+    """Paginated response for project listing."""
+    
+    jobs: List[dict] = Field(..., description="List of projects")
+    total: int = Field(..., description="Total number of projects available")
+    page: int = Field(..., description="Current page number")
+    pages: int = Field(..., description="Total number of pages")
+    limit: int = Field(..., description="Number of results per page")
+    source: str = Field(..., description="Data source used")
+    dataset_id: Optional[str] = Field(None, description="HuggingFace dataset ID if applicable")
 
 
 class ProjectDiscoverRequest(BaseModel):
     """Request model for discovering new projects."""
     
-    keywords: List[str] = Field(..., description="Keywords to search for")
+    keywords: List[str] = Field(default_factory=list, description="Keywords to search for")
     platforms: List[str] = Field(default_factory=list, description="Platforms to search (upwork, freelancer, etc.)")
     max_results: int = Field(20, ge=1, le=100, description="Maximum results to return")
+    dataset_id: Optional[str] = Field(None, description="HuggingFace dataset ID (default from env)")
 
 
 class ProjectDiscoverResponse(BaseModel):
@@ -85,8 +103,15 @@ class ProjectDiscoverResponse(BaseModel):
 
 class ProjectStats(BaseModel):
     """Statistics about discovered projects."""
-    
+
     total_jobs: int = Field(..., description="Total number of jobs discovered")
     by_platform: dict = Field(default_factory=dict, description="Job count by platform")
     by_skill: dict = Field(default_factory=dict, description="Job count by skill")
     avg_budget: Optional[float] = Field(None, description="Average budget")
+    # Redesigned stats (AI/freelance trends 2025)
+    top_in_demand_skill: Optional[str] = Field(
+        None, description="Most relevant in-demand skill (prioritizes AI, Python, modern dev)"
+    )
+    data_source: Optional[str] = Field(
+        None, description="Primary data source (e.g. HuggingFace)"
+    )

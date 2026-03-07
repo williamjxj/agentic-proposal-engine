@@ -7,7 +7,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
 import { demoUserConfig } from '@/lib/config/demo-user'
@@ -22,6 +22,8 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const { signIn } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const redirectTo = searchParams.get('redirect') ?? '/dashboard'
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -29,12 +31,10 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      const { error: signInError } = await signIn(email, password)
+      const { error: signInError } = await signIn(email, password, redirectTo)
 
       if (signInError) {
         setError(signInError.message)
-      } else {
-        router.push('/dashboard')
       }
     } catch (_err) {
       setError('An unexpected error occurred')
@@ -51,13 +51,12 @@ export default function LoginPage() {
     try {
       const { error: signInError } = await signIn(
         demoUserConfig.email,
-        demoUserConfig.password
+        demoUserConfig.password,
+        redirectTo
       )
 
       if (signInError) {
         setError(signInError.message)
-      } else {
-        router.push('/dashboard')
       }
     } catch (_err) {
       setError('An unexpected error occurred')

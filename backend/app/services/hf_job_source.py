@@ -49,7 +49,8 @@ def normalize_hf_job(record: dict, source_dataset: str) -> dict:
             "company": record.get("company_name", "Unknown Company"),
             "description": record.get("job_description", ""),
             "requirements": record.get("job_requirements", ""),
-            "skills": _extract_skills_from_text(record.get("job_requirements", "")),
+            "skills": _extract_skills_from_text(record.get("job_requirements", ""))
+                or _extract_skills_from_text(record.get("job_description", "")[:500]),
             "budget_min": None,
             "budget_max": None,
             "budget_type": "fixed",
@@ -152,11 +153,28 @@ def normalize_hf_job(record: dict, source_dataset: str) -> dict:
     }
 
 
+# Common tech terms to extract from job descriptions when no structured skills exist
+# Ordered: AI/trending first, then modern dev, then foundational (matches 2025 Upwork trends)
+_COMMON_TECH_TERMS = [
+    # AI & emerging (Upwork 2025: Generative AI, AI data annotation, agentic)
+    "python", "machine learning", "deep learning", "tensorflow", "pytorch",
+    "langchain", "llm", "nlp", "transformers", "openai", "generative ai",
+    "ai", "agentic", "chatbot", "data science", "data analytics",
+    # Modern dev (scripting, automation, full-stack)
+    "javascript", "typescript", "react", "node", "fastapi", "django", "flask",
+    "vue", "angular", "sql", "postgresql", "mongodb", "redis",
+    "docker", "kubernetes", "aws", "azure", "gcp",
+    "pandas", "numpy", "automation", "scripting",
+    # Foundational
+    "html", "css", "git", "rest", "api", "graphql",
+]
+
 def _extract_skills_from_text(text: str) -> List[str]:
     """
     Extract skills from text field.
     
     Handles comma-separated, pipe-separated, and other formats.
+    Falls back to common tech term detection for long unstructured text.
     """
     if not text or not isinstance(text, str):
         return []
@@ -165,13 +183,18 @@ def _extract_skills_from_text(text: str) -> List[str]:
     for sep in [",", "|", ";", "/"]:
         if sep in text:
             skills = [s.strip() for s in text.split(sep)]
-            return [s for s in skills if s and len(s) < 50]  # Filter out long strings
+            result = [s for s in skills if s and len(s) < 50]
+            if result:
+                return result
     
     # If no separator, return as single skill if reasonable length
     if len(text) < 50:
-        return [text.strip()]
+        return [text.strip()] if text.strip() else []
     
-    return []
+    # Fallback: extract known tech terms from long text (e.g. job descriptions)
+    text_lower = text.lower()
+    found = [term for term in _COMMON_TECH_TERMS if term in text_lower]
+    return list(dict.fromkeys(found))  # preserve order, dedupe
 
 
 def _generate_recent_date() -> str:
@@ -247,9 +270,13 @@ def fetch_hf_jobs(
             logger.warning(f"Failed to normalize record: {e}")
             continue
         
-        # Optional keyword filter
+        # Optional keyword filter (search in title, description, requirements, skills)
         if keyword_filter:
-            text = f"{normalized.get('title', '')} {normalized.get('description', '')}".lower()
+            skills_str = " ".join(normalized.get("skills") or [])
+            text = (
+                f"{normalized.get('title', '')} {normalized.get('description', '')} "
+                f"{normalized.get('requirements', '')} {skills_str}"
+            ).lower()
             if not any(kw.lower() in text for kw in keyword_filter):
                 continue
         

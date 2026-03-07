@@ -28,6 +28,9 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { EmptyState } from '@/components/shared/empty-state'
 import { useReduceMotion } from '@/hooks/useReduceMotion'
+import { cn } from '@/lib/utils'
+
+type ProjectsTab = 'search' | 'chat' | 'discover'
 
 interface PageProjectFilters {
   search: string
@@ -35,6 +38,11 @@ interface PageProjectFilters {
   platforms: string[]
   minBudget?: number
   maxBudget?: number
+  category?: string
+  startDate?: string
+  endDate?: string
+  applied?: boolean
+  sortBy?: string
 }
 
 function toApiFilters(f: PageProjectFilters): ProjectFilters {
@@ -44,6 +52,11 @@ function toApiFilters(f: PageProjectFilters): ProjectFilters {
     platforms: f.platforms.length ? f.platforms : undefined,
     min_budget: f.minBudget,
     max_budget: f.maxBudget,
+    category: f.category || undefined,
+    start_date: f.startDate || undefined,
+    end_date: f.endDate || undefined,
+    applied: f.applied,
+    sort_by: f.sortBy,
   }
 }
 
@@ -59,20 +72,26 @@ const itemVariants = {
   visible: (reduceMotion: boolean) => (reduceMotion ? {} : { opacity: 1, y: 0 }),
 }
 
-/** Memoized header/filters - does not re-render when projects or loading state change */
+/** Memoized header/filters with tabs */
 const ProjectsHeader = memo(function ProjectsHeader({
+  activeTab,
+  onTabChange,
   filters,
   onFiltersChange,
   onSearch,
   onOpenDiscover,
   isSearching,
 }: {
+  activeTab: ProjectsTab
+  onTabChange: (t: ProjectsTab) => void
   filters: PageProjectFilters
   onFiltersChange: (f: PageProjectFilters) => void
   onSearch: () => void
   onOpenDiscover: () => void
   isSearching: boolean
 }) {
+  const [showAdvanced, setShowAdvanced] = useState(false)
+
   return (
     <>
       <PageHeader
@@ -81,47 +100,208 @@ const ProjectsHeader = memo(function ProjectsHeader({
       >
         <Button onClick={onOpenDiscover}>Discover Jobs</Button>
       </PageHeader>
-      <div className="flex flex-col sm:flex-row gap-3">
-        <Input
-          type="text"
-          placeholder="Search projects..."
-          value={filters.search}
-          onChange={(e) => onFiltersChange({ ...filters, search: e.target.value })}
-          onKeyDown={(e) => e.key === 'Enter' && onSearch()}
-          className="flex-1"
-        />
-        <Button variant="secondary" onClick={onSearch} disabled={isSearching}>
-          {isSearching ? 'Searching...' : 'Search'}
-        </Button>
+
+      {/* Tabs */}
+      <div className="flex border-b border-slate-200 dark:border-slate-700 mb-4">
+        {[
+          { id: 'search', label: 'Search Projects' },
+          { id: 'chat', label: 'AI Chat' },
+          { id: 'discover', label: 'External Discovery' }
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => onTabChange(tab.id as ProjectsTab)}
+            className={cn(
+              'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
+              activeTab === tab.id
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            )}
+            aria-selected={activeTab === tab.id}
+            role="tab"
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="space-y-4">
+        {activeTab === 'discover' ? (
+          <p className="text-sm text-muted-foreground py-2">
+            Click <strong>Discover Jobs</strong> above to fetch new jobs from HuggingFace with custom keywords.
+          </p>
+        ) : activeTab === 'chat' ? (
+          <p className="text-sm text-muted-foreground py-2">
+            Ask our AI about projects, skills in demand, or help matching your profile.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <Input
+                  type="text"
+                  placeholder="Search projects (e.g. python, fastapi)..."
+                  value={filters.search}
+                  onChange={(e) => onFiltersChange({ ...filters, search: e.target.value })}
+                  onKeyDown={(e) => e.key === 'Enter' && onSearch()}
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setShowAdvanced(!showAdvanced)}>
+                  {showAdvanced ? 'Hide Filters' : 'Advanced Filters'}
+                </Button>
+                <Button onClick={onSearch} disabled={isSearching}>
+                  {isSearching ? 'Searching...' : 'Search'}
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <p className="text-xs text-muted-foreground self-center mr-1 font-medium italic">Popular:</p>
+              {['Python', 'FastAPI', 'React', 'Agentic AI', 'Scraping'].map((kw) => (
+                <Badge
+                  key={kw}
+                  variant="secondary"
+                  className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-all duration-200 border-primary/10"
+                  onClick={() => {
+                    onFiltersChange({ ...filters, search: kw })
+                    // Small delay to ensure state update before search if needed, 
+                    // though handler will use current closure val normally
+                    setTimeout(onSearch, 0)
+                  }}
+                >
+                  {kw}
+                </Badge>
+              ))}
+            </div>
+
+            {showAdvanced && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700"
+              >
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold uppercase text-muted-foreground">Category</label>
+                  <select
+                    className="w-full text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded px-2 py-1.5"
+                    value={filters.category || ''}
+                    onChange={(e) => onFiltersChange({ ...filters, category: e.target.value })}
+                  >
+                    <option value="">All Categories</option>
+                    <option value="development">Development</option>
+                    <option value="design">Design</option>
+                    <option value="writing">Writing</option>
+                    <option value="marketing">Marketing</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold uppercase text-muted-foreground">Sort By</label>
+                  <select
+                    className="w-full text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded px-2 py-1.5"
+                    value={filters.sortBy || 'date'}
+                    onChange={(e) => onFiltersChange({ ...filters, sortBy: e.target.value })}
+                  >
+                    <option value="date">Newest First</option>
+                    <option value="category">Category</option>
+                    <option value="budget">Budget (High to Low)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold uppercase text-muted-foreground">Applied Status</label>
+                  <div className="flex items-center gap-2 pt-1.5">
+                    <input
+                      type="checkbox"
+                      id="applied-filter"
+                      checked={filters.applied || false}
+                      onChange={(e) => onFiltersChange({ ...filters, applied: e.target.checked })}
+                      className="rounded border-slate-300"
+                    />
+                    <label htmlFor="applied-filter" className="text-sm">Only Applied</label>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold uppercase text-muted-foreground">Date Range</label>
+                  <div className="flex gap-2">
+                    <Input
+                      type="date"
+                      className="h-8 text-[10px]"
+                      value={filters.startDate || ''}
+                      onChange={(e) => onFiltersChange({ ...filters, startDate: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </div>
+        )}
       </div>
     </>
   )
 })
 
-/** Stats section - rendered once, uses cached data */
+/** AI/trending skills for badge styling (Upwork 2025 in-demand) */
+const AI_TRENDING_SKILLS = new Set([
+  'python', 'ai', 'machine learning', 'llm', 'langchain', 'agentic',
+  'generative ai', 'deep learning', 'data science', 'chatbot', 'nlp',
+  'tensorflow', 'pytorch', 'automation', 'scripting', 'react', 'fastapi',
+])
+
+/** Stats section - redesigned for AI/freelance trends 2025 */
 function ProjectsStats({ stats }: { stats: ProjectStats | null }) {
   if (!stats) return null
+
+  const topSkill =
+    stats.top_in_demand_skill ??
+    (stats.by_skill && Object.keys(stats.by_skill).length > 0
+      ? Object.entries(stats.by_skill)
+          .sort((a, b) => b[1] - a[1])[0]?.[0]
+          ?.replace(/^\w/, (c) => c.toUpperCase()) ?? 'N/A'
+      : 'N/A')
+  const isAiSkill = typeof topSkill === 'string'
+    && AI_TRENDING_SKILLS.has(topSkill.toLowerCase())
+  const dataSource =
+    stats.data_source ||
+    (stats.by_platform && Object.keys(stats.by_platform).length > 0 ? 'HuggingFace' : null) ||
+    '—'
+  const avgBudget = stats.avg_budget != null && stats.avg_budget > 0
+    ? `$${Math.round(stats.avg_budget).toLocaleString()}`
+    : null
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div
+      className={cn(
+        'grid gap-4',
+        avgBudget ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+      )}
+    >
       <StatsCard
-        title="Total Jobs"
+        title="Total Opportunities"
         value={stats.total_jobs || 0}
-        tip="Total number of relevant projects found across all sources"
+        tip="Projects currently available from your data sources"
       />
       <StatsCard
-        title="Platforms"
-        value={stats.by_platform ? Object.keys(stats.by_platform).length : 0}
-        tip="Number of freelance platforms (Upwork, Freelancer, etc.) monitoring"
+        title="Data Source"
+        value={dataSource}
+        tip="Where job data comes from (HuggingFace datasets, or live platforms when enabled)"
       />
       <StatsCard
-        title="Top Skill"
-        value={
-          stats.by_skill && Object.keys(stats.by_skill).length > 0
-            ? Object.entries(stats.by_skill).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'N/A'
-            : 'N/A'
-        }
-        tip="The most in-demand skill based on current job descriptions"
+        title="Top In-Demand Skill"
+        value={topSkill}
+        tip="Most relevant skill in current listings. Prioritizes AI, Python, and modern dev skills—aligned with 2025 freelance trends."
+        highlight={isAiSkill}
       />
+      {avgBudget && (
+        <StatsCard
+          title="Avg. Budget"
+          value={avgBudget}
+          tip="Average project budget across listed opportunities"
+        />
+      )}
     </div>
   )
 }
@@ -130,13 +310,22 @@ function StatsCard({
   title,
   value,
   tip,
+  highlight = false,
 }: {
   title: string
   value: string | number
   tip?: string
+  highlight?: boolean
 }) {
   return (
-    <div className="group relative rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:border-primary/30 dark:border-slate-800 dark:bg-slate-900/50">
+    <div
+      className={cn(
+        'group relative rounded-xl border p-5 shadow-sm transition-all duration-300 hover:shadow-md',
+        highlight
+          ? 'border-primary/40 bg-primary/5 dark:bg-primary/10 dark:border-primary/30'
+          : 'border-slate-200 bg-white hover:border-primary/30 dark:border-slate-800 dark:bg-slate-900/50'
+      )}
+    >
       <div className="flex items-center justify-between mb-2">
         <p className="text-sm font-medium text-muted-foreground">{title}</p>
         {tip && (
@@ -149,7 +338,16 @@ function StatsCard({
           </div>
         )}
       </div>
-      <p className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+      <p
+        className={cn(
+          'text-2xl font-bold tracking-tight',
+          typeof value === 'number'
+            ? 'bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent'
+            : highlight
+              ? 'text-primary'
+              : 'text-foreground'
+        )}
+      >
         {value}
       </p>
     </div>
@@ -163,12 +361,20 @@ const ProjectsResults = memo(function ProjectsResults({
   searchHighlight,
   onDiscoverClick,
   reduceMotion,
+  pagination,
+  onPageChange,
 }: {
   projects: Project[]
   isLoading: boolean
   searchHighlight: string
   onDiscoverClick: () => void
   reduceMotion: boolean
+  pagination?: {
+    page: number
+    pages: number
+    total: number
+  }
+  onPageChange: (page: number) => void
 }) {
   if (isLoading) {
     return <CardListSkeleton count={5} />
@@ -188,23 +394,55 @@ const ProjectsResults = memo(function ProjectsResults({
     )
   }
   return (
-    <motion.div
-      className="grid gap-6"
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-      custom={reduceMotion}
-    >
-      {projects.map((project, i) => (
-        <motion.div
-          key={project.id || (project as { external_id?: string }).external_id || i}
-          variants={itemVariants}
-          custom={reduceMotion}
-        >
-          <ProjectCard project={project} highlight={searchHighlight} />
-        </motion.div>
-      ))}
-    </motion.div>
+    <div className="space-y-6">
+      <motion.div
+        className="grid gap-6"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        custom={reduceMotion}
+      >
+        {projects.map((project, i) => (
+          <motion.div
+            key={`${project.id ?? (project as { external_id?: string }).external_id ?? 'p'}-${i}`}
+            variants={itemVariants}
+            custom={reduceMotion}
+          >
+            <ProjectCard project={project} highlight={searchHighlight} />
+          </motion.div>
+        ))}
+      </motion.div>
+
+      {pagination && pagination.pages > 1 && (
+        <div className="flex items-center justify-between border-t border-slate-200 dark:border-slate-800 pt-6">
+          <p className="text-sm text-muted-foreground">
+            Showing <span className="font-medium">{projects.length}</span> of{' '}
+            <span className="font-medium">{pagination.total}</span> projects
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pagination.page <= 1}
+              onClick={() => onPageChange(pagination.page - 1)}
+            >
+              Previous
+            </Button>
+            <div className="flex items-center px-4 text-sm font-medium">
+              Page {pagination.page} of {pagination.pages}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pagination.page >= pagination.pages}
+              onClick={() => onPageChange(pagination.page + 1)}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
   )
 })
 
@@ -260,6 +498,11 @@ function ProjectCard({ project, highlight }: { project: Project; highlight: stri
               <Badge variant="secondary" className="uppercase shrink-0">
                 {project.platform}
               </Badge>
+              {(project as { source?: string }).source && (
+                <Badge variant="outline" className="text-xs shrink-0" title={`Source: ${(project as { source?: string }).source}`}>
+                  {(project as { source?: string }).source?.includes('freelancer') ? 'Freelancer' : 'HuggingFace'}
+                </Badge>
+              )}
             </div>
             <p className="text-sm font-medium text-muted-foreground mt-1 flex items-center gap-1.5">
               🏢 <HighlightText text={project.company} highlight={highlight} />
@@ -308,9 +551,87 @@ function ProjectCard({ project, highlight }: { project: Project; highlight: stri
             </span>
           )}
         </div>
-        <Button onClick={handleGenerateProposal} className="shimmer-button">
+        <Button onClick={handleGenerateProposal}>
           Generate Proposal
         </Button>
+      </CardFooter>
+    </Card>
+  )
+}
+
+function ChatSection() {
+  const [messages, setMessages] = useState<{ role: 'user' | 'ai'; content: string }[]>([
+    { role: 'ai', content: 'Hello! I can help you search projects, analyze your skills, or suggest matches. What would you like to know?' }
+  ])
+  const [input, setInput] = useState('')
+  const [isTyping, setIsTyping] = useState(false)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  const handleSend = async () => {
+    if (!input.trim() || isTyping) return
+
+    const userMsg = input
+    setInput('')
+    setMessages(prev => [...prev, { role: 'user', content: userMsg }])
+    setIsTyping(true)
+
+    try {
+      const { chatWithProjects } = await import('@/lib/api/client')
+      const result = await chatWithProjects(userMsg)
+
+      setMessages(prev => [...prev, { role: 'ai', content: result?.response || "I'm sorry, I couldn't process that." }])
+    } catch (error) {
+      setMessages(prev => [...prev, { role: 'ai', content: "Error connecting to AI service." }])
+    } finally {
+      setIsTyping(false)
+    }
+  }
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    }
+  }, [messages])
+
+  return (
+    <Card className="flex flex-col h-[600px] shadow-lg border-primary/20 bg-white dark:bg-slate-900">
+      <CardHeader className="border-b bg-slate-50/50 dark:bg-slate-800/50">
+        <div className="flex items-center gap-2">
+          <span className="text-2xl">🤖</span>
+          <div>
+            <h3 className="font-bold text-lg">Project Assistant</h3>
+            <p className="text-xs text-muted-foreground">Ask anything about the current job market</p>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.map((m, i) => (
+          <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm shadow-sm ${m.role === 'user'
+              ? 'bg-primary text-primary-foreground rounded-tr-none'
+              : 'bg-slate-100 dark:bg-slate-800 text-foreground rounded-tl-none border border-slate-200 dark:border-slate-700'
+              }`}>
+              {m.content}
+            </div>
+          </div>
+        ))}
+        {isTyping && (
+          <div className="flex justify-start">
+            <div className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl rounded-tl-none px-4 py-3 text-sm animate-pulse">
+              AI is thinking...
+            </div>
+          </div>
+        )}
+      </CardContent>
+      <CardFooter className="border-t p-4 flex gap-2 bg-slate-50/50 dark:bg-slate-800/50">
+        <Input
+          placeholder="Ask about python jobs, market trends..."
+          value={input}
+          className="bg-white dark:bg-slate-900"
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+        />
+        <Button onClick={handleSend} disabled={isTyping} className="shrink-0 shadow-sm">Send</Button>
       </CardFooter>
     </Card>
   )
@@ -375,7 +696,7 @@ function DiscoverDialog({
           <button
             onClick={onDiscover}
             disabled={isDiscovering}
-            className="shimmer-button flex-1 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 min-h-[44px] sm:min-h-0"
+            className="flex-1 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 min-h-[44px] sm:min-h-0"
           >
             {isDiscovering ? 'Discovering...' : 'Discover'}
           </button>
@@ -399,12 +720,16 @@ export default function ProjectsPage() {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   const savedFilters = getFilters<PageProjectFilters>()
+  const [currentPage, setCurrentPage] = useState(1)
   const [filters, setFiltersState] = useState<PageProjectFilters>({
     search: savedFilters.search || '',
     skills: savedFilters.skills || [],
     platforms: savedFilters.platforms || [],
     minBudget: savedFilters.minBudget,
     maxBudget: savedFilters.maxBudget,
+    category: savedFilters.category || '',
+    applied: savedFilters.applied || false,
+    sortBy: savedFilters.sortBy || 'date',
   })
   const [appliedFilters, setAppliedFilters] = useState<PageProjectFilters>(() => ({
     search: savedFilters.search || '',
@@ -412,14 +737,20 @@ export default function ProjectsPage() {
     platforms: savedFilters.platforms || [],
     minBudget: savedFilters.minBudget,
     maxBudget: savedFilters.maxBudget,
+    category: savedFilters.category || '',
+    applied: savedFilters.applied || false,
+    sortBy: savedFilters.sortBy || 'date',
   }))
   const [showDiscoverDialog, setShowDiscoverDialog] = useState(false)
   const [discoverKeywords, setDiscoverKeywords] = useState('')
   const [selectedDataset, setSelectedDataset] = useState('')
   const [discoveryResult, setDiscoveryResult] = useState<{ count: number; dataset: string; keywords: string[] } | null>(null)
+  const [activeTab, setActiveTab] = useState<ProjectsTab>('search')
 
+  const apiLimit = 50
+  const apiOffset = (currentPage - 1) * apiLimit
   const apiFilters = toApiFilters(appliedFilters)
-  const { data: projectsData, isLoading, isFetching, refetch } = useProjects(apiFilters, 50, 0)
+  const { data: projectsData, isLoading, isFetching, refetch } = useProjects(apiFilters, apiLimit, apiOffset)
   const { data: stats } = useProjectStats()
   const { data: datasets = [] } = useProjectDatasets()
   const discoverMutation = useDiscoverProjects()
@@ -485,6 +816,8 @@ export default function ProjectsPage() {
   return (
     <PageContainer ref={scrollContainerRef} className="space-y-6">
       <ProjectsHeader
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
         filters={filters}
         onFiltersChange={setFiltersState}
         onSearch={handleSearch}
@@ -518,13 +851,24 @@ export default function ProjectsPage() {
               </p>
             </div>
           )}
-          <ProjectsResults
-            projects={projects}
-            isLoading={isFetching && projects.length === 0}
-            searchHighlight={appliedFilters.search}
-            onDiscoverClick={() => setShowDiscoverDialog(true)}
-            reduceMotion={reduceMotion}
-          />
+
+          {activeTab === 'chat' ? (
+            <ChatSection />
+          ) : (
+            <ProjectsResults
+              projects={projects}
+              isLoading={isFetching && projects.length === 0}
+              searchHighlight={appliedFilters.search}
+              onDiscoverClick={() => setShowDiscoverDialog(true)}
+              reduceMotion={reduceMotion}
+              pagination={projectsData ? {
+                page: projectsData.page,
+                pages: projectsData.pages,
+                total: projectsData.total
+              } : undefined}
+              onPageChange={(p) => setCurrentPage(p)}
+            />
+          )}
         </>
       )}
 

@@ -117,6 +117,15 @@ class ApiClient {
       }
 
       if (!response.ok) {
+        // 401: clear session and redirect to login so user can re-authenticate
+        if (response.status === 401 && typeof window !== 'undefined') {
+          localStorage.removeItem(TOKEN_KEY)
+          document.cookie = 'auth_token=; path=/; max-age=0'
+          const redirect = encodeURIComponent(window.location.pathname)
+          window.location.href = `/login?redirect=${redirect}`
+          return { data: null, error: 'Session expired' }
+        }
+
         // Create enhanced error object with response details
         const enhancedError = {
           status: response.status,
@@ -729,6 +738,21 @@ export interface ProjectFilters {
   min_budget?: number
   max_budget?: number
   platforms?: string[]
+  category?: string
+  start_date?: string
+  end_date?: string
+  applied?: boolean
+  sort_by?: string
+}
+
+export interface ProjectListResponse {
+  jobs: Project[]
+  total: number
+  page: number
+  pages: number
+  limit: number
+  source: string
+  dataset_id?: string
 }
 
 export interface Project {
@@ -764,6 +788,10 @@ export interface ProjectStats {
   by_platform: Record<string, number>
   by_skill: Record<string, number>
   avg_budget?: number
+  /** Most relevant in-demand skill (prioritizes AI, Python, modern dev) */
+  top_in_demand_skill?: string | null
+  /** Primary data source (e.g. HuggingFace) */
+  data_source?: string | null
 }
 
 export interface DatasetInfo {
@@ -796,20 +824,40 @@ export async function listProjects(
   filters?: ProjectFilters,
   limit: number = 50,
   offset: number = 0
-): Promise<{ jobs: Project[]; total: number } | null> {
+): Promise<ProjectListResponse | null> {
   const backend = getBackendUrl()
   const params = new URLSearchParams()
+  params.append('limit', String(limit))
+  params.append('offset', String(offset))
 
   if (filters?.search) params.append('search', filters.search)
-  if (filters?.skills) params.append('skills', filters.skills.join(','))
-  if (filters?.min_budget) params.append('min_budget', filters.min_budget.toString())
-  if (filters?.max_budget) params.append('max_budget', filters.max_budget.toString())
-  if (filters?.platforms) params.append('platforms', filters.platforms.join(','))
-  params.append('limit', limit.toString())
-  params.append('offset', offset.toString())
+  if (filters?.min_budget) params.append('min_budget', String(filters.min_budget))
+  if (filters?.max_budget) params.append('max_budget', String(filters.max_budget))
+  if (filters?.platforms && filters.platforms.length > 0) {
+    // API expects multiple platforms as repeated params or handled by router?
+    // Current router handles single platform. We'll send first for now or handle all.
+    params.append('platform', filters.platforms[0])
+  }
+  if (filters?.category) params.append('category', filters.category)
+  if (filters?.start_date) params.append('start_date', filters.start_date)
+  if (filters?.end_date) params.append('end_date', filters.end_date)
+  if (filters?.applied !== undefined) params.append('applied', String(filters.applied))
+  if (filters?.sort_by) params.append('sort_by', filters.sort_by)
 
-  const url = `${backend}/api/projects/list${params.toString() ? '?' + params.toString() : ''}`
-  const { data } = await apiClient.get<{ jobs: Project[]; total: number }>(url)
+  const { data } = await apiClient.get<ProjectListResponse>(
+    `${backend}/api/projects/list?${params.toString()}`
+  )
+  return data
+}
+
+/**
+ * Chat with projects dataset
+ */
+export async function chatWithProjects(query: string): Promise<{ response: string } | null> {
+  const backend = getBackendUrl()
+  const { data } = await apiClient.post<{ response: string }>(
+    `${backend}/api/projects/chat?query=${encodeURIComponent(query)}`
+  )
   return data
 }
 
