@@ -1,6 +1,6 @@
 /**
  * useKnowledgeBase Hook
- * 
+ *
  * React Query hooks for knowledge base document management.
  */
 
@@ -88,8 +88,23 @@ export function useUploadDocument() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: ({ file, collection }: { file: File; collection: string }) =>
-      uploadDocument(file, collection),
+    mutationFn: ({
+      file,
+      collection,
+      options
+    }: {
+      file: File;
+      collection: string;
+      options?: {
+        title?: string;
+        supplemental_info?: string;
+        reference_url?: string;
+        email?: string;
+        phone?: string;
+        contact_url?: string;
+      }
+    }) =>
+      uploadDocument(file, collection, options),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: documentKeys.lists() })
     },

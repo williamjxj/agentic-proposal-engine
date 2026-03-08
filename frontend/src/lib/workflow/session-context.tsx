@@ -50,6 +50,7 @@ export function WorkflowProvider({ children }: { children: React.ReactNode }) {
   const stateRef = React.useRef<SessionState | null>(null)
   const lastSyncRef = React.useRef<number>(0)
   const syncWithServerRef = React.useRef<((force?: boolean) => Promise<void>) | null>(null)
+  const lastTrackedPathRef = React.useRef<string | null>(null)
 
   useEffect(() => {
     stateRef.current = sessionState
@@ -249,19 +250,22 @@ export function WorkflowProvider({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval)
   }, [sessionState?.id, isOnline]) // Only re-run if session ID changes or online status changes
 
-  // Track route changes
+  // Track route changes (client-side navigation)
   useEffect(() => {
-    if (!sessionState || !pathname) return
+    if (!pathname) return
 
-    // Only track dashboard routes
-    if (pathname.startsWith('/dashboard')) {
-      // Only update if path actually changed
-      if (sessionState.current_path !== pathname) {
-        updateNavigation(pathname)
-      }
+    // Skip if we already tracked this path (prevents duplicate calls when sidebar click + effect both fire)
+    if (lastTrackedPathRef.current === pathname) return
+
+    // Skip if session state already matches (prevents update->setState->re-render->update loop)
+    if (sessionState?.current_path === pathname) {
+      lastTrackedPathRef.current = pathname
+      return
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, sessionState?.current_path])
+
+    lastTrackedPathRef.current = pathname
+    updateNavigation(pathname)
+  }, [pathname, sessionState?.current_path, updateNavigation])
 
 
   /**

@@ -191,7 +191,6 @@ import type {
   SessionState,
   SessionStateUpdate,
   DraftWork,
-  DraftSaveRequest,
   OfflineChange,
   SyncBatchResponse,
   ConflictResolution,
@@ -283,14 +282,17 @@ export async function getDraft(
 export async function saveDraft(
   entityType: string,
   entityId: string,
-  draftRequest: DraftSaveRequest
+  draftRequest: { draft_data: Record<string, unknown>; version: number }
 ): Promise<DraftWork | null> {
   const backend = getBackendUrl()
   const { data, error } = await apiClient.put<DraftWork>(
     `${backend}/api/drafts/${entityType}/${entityId}`,
     draftRequest
   )
-  if (error) throw new Error(error)
+  if (error) {
+    const msg = typeof error === 'string' ? error : JSON.stringify(error)
+    throw new Error(msg)
+  }
   return data
 }
 
@@ -533,13 +535,42 @@ export async function getDocument(documentId: string): Promise<Document | null> 
 
 export async function uploadDocument(
   file: File,
-  collection: string
+  collection: string,
+  options?: {
+    title?: string
+    supplemental_info?: string
+    reference_url?: string
+    email?: string
+    phone?: string
+    contact_url?: string
+  }
 ): Promise<Document | null> {
   const backend = getBackendUrl()
   const formData = new FormData()
   formData.append('file', file)
 
   const queryParams = new URLSearchParams({ collection })
+
+  // Add optional fields to query params if provided
+  if (options?.title) {
+    queryParams.append('title', options.title)
+  }
+  if (options?.supplemental_info) {
+    queryParams.append('supplemental_info', options.supplemental_info)
+  }
+  if (options?.reference_url) {
+    queryParams.append('reference_url', options.reference_url)
+  }
+  if (options?.email) {
+    queryParams.append('email', options.email)
+  }
+  if (options?.phone) {
+    queryParams.append('phone', options.phone)
+  }
+  if (options?.contact_url) {
+    queryParams.append('contact_url', options.contact_url)
+  }
+
   const { data } = await apiClient.post<Document>(
     `${backend}/api/documents/upload?${queryParams.toString()}`,
     formData

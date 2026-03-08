@@ -8,7 +8,7 @@
 
 'use client'
 
-import { Suspense, useState, useEffect } from 'react'
+import { Suspense, useState, useEffect, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAutoSave } from '@/hooks/useAutoSave'
 import { useDraftRecovery } from '@/hooks/useDraftRecovery'
@@ -59,6 +59,7 @@ function NewProposalPageContent() {
     skills: '',
   })
   const [isInitialized, setIsInitialized] = useState(false)
+  const [isLoaded, setIsLoaded] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [jobContext, setJobContext] = useState<JobContext | null>(null)
@@ -68,9 +69,11 @@ function NewProposalPageContent() {
   const [strategies, setStrategies] = useState<{ id: string; name: string; is_default?: boolean }[]>([])
   const [selectedStrategyId, setSelectedStrategyId] = useState<string | null>(null)
 
+  // Stable jobId for effect deps – avoids searchParams reference changes causing re-run storms
+  const jobId = searchParams.get('jobId')
+
   // Load job context from sessionStorage (cache) or API by jobId – avoids passing model_response in URL
   useEffect(() => {
-    const jobId = searchParams.get('jobId')
     if (!jobId) return
 
     const applyProject = (p: {
@@ -126,7 +129,70 @@ function NewProposalPageContent() {
     getProject(jobId).then((project) => {
       if (project) applyProject(project)
     })
-  }, [searchParams])
+  }, [jobId])
+
+  const editId = searchParams.get('editId')
+
+  const getSafeDraftId = (id: string | null) => {
+    if (!id || id === 'new') return 'new'
+
+    // Standard UUID regex (36 chars with hyphens)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (uuidRegex.test(id)) return id
+
+    // Hex string (32 chars) - often used for UUIDs without hyphens
+    if (/^[0-9a-f]{32}$/i.test(id)) {
+      return `${id.slice(0, 8)}-${id.slice(8, 12)}-${id.slice(12, 16)}-${id.slice(16, 20)}-${id.slice(20)}`
+    }
+
+    // Fallback: If not a UUID, it might be a collision risk if we use 'new'
+    // But since the backend expects UUID in the path, we must provide one or 'new'
+    return 'new'
+  }
+
+  const draftId = getSafeDraftId(editId || jobId)
+
+  // Load existing proposal if editing
+  useEffect(() => {
+    if (!editId) {
+      setIsLoaded(true)
+      return
+    }
+
+    const loadProposal = async () => {
+      try {
+        const { getProposal } = await import('@/lib/api/client')
+        const p = await getProposal(editId)
+        if (p) {
+          setFormData({
+            title: p.title || '',
+            description: p.description || '',
+            budget: p.budget || '',
+            timeline: p.timeline || '',
+            skills: Array.isArray(p.skills) ? p.skills.join(', ') : '',
+          })
+          if (p.job_id) {
+            setJobContext({
+              id: p.job_id,
+              title: p.job_title || 'Linked Job',
+              company: p.client_name || 'Unknown Company',
+              description: '',
+              platform: p.job_platform || 'Unknown',
+            })
+          }
+          if (p.strategy_id) {
+            setSelectedStrategyId(p.strategy_id)
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load proposal for editing:', err)
+        toast.error('Failed to load proposal')
+      } finally {
+        setIsLoaded(true)
+      }
+    }
+    loadProposal()
+  }, [editId])
 
   // Draft recovery
   const {
@@ -137,7 +203,7 @@ function NewProposalPageContent() {
     dismissPrompt,
   } = useDraftRecovery({
     entityType: 'proposal',
-    entityId: null, // null for new proposals
+    entityId: draftId,
     onRecover: (recoveredDraft) => {
       // Restore form data from draft
       const draftData = recoveredDraft.draftData
@@ -186,20 +252,38 @@ function NewProposalPageContent() {
     currentVersion,
   } = useAutoSave({
     entityType: 'proposal',
-    entityId: null,
-    data: {
-      ...formData,
-      jobId: jobContext?.id,
-      jobTitle: jobContext?.title,
-      jobCompany: jobContext?.company,
-      jobDescription: jobContext?.description,
-      jobPlatform: jobContext?.platform,
-      jobSkills: jobContext?.skills,
-      jobBudget: jobContext?.budget,
-      jobModelResponse: jobContext?.model_response,
-      strategy_id: selectedStrategyId,
-    },
-    enabled: isInitialized && !showRecoveryPrompt,
+    entityId: draftId,
+    data: useMemo(
+      () => ({
+        ...formData,
+        jobId: jobContext?.id,
+        jobTitle: jobContext?.title,
+        jobCompany: jobContext?.company,
+        jobDescription: jobContext?.description,
+        jobPlatform: jobContext?.platform,
+        jobSkills: jobContext?.skills,
+        jobBudget: jobContext?.budget,
+        jobModelResponse: jobContext?.model_response,
+        strategy_id: selectedStrategyId,
+      }),
+      [
+        formData.title,
+        formData.description,
+        formData.budget,
+        formData.timeline,
+        formData.skills,
+        jobContext?.id,
+        jobContext?.title,
+        jobContext?.company,
+        jobContext?.description,
+        jobContext?.platform,
+        jobContext?.skills,
+        jobContext?.budget,
+        jobContext?.model_response,
+        selectedStrategyId,
+      ]
+    ),
+    enabled: isInitialized && isLoaded && !showRecoveryPrompt,
     onSaveSuccess: (draft) => {
       console.log('Draft saved successfully:', draft)
     },
@@ -233,20 +317,20 @@ function NewProposalPageContent() {
     }))
   }
 
-  // Handle form submission - create proposal directly from form data (no draft dependency)
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Handle form submission
+  const handleSubmit = async (e: React.FormEvent, saveAsDraft = false) => {
     e.preventDefault()
     setIsSubmitting(true)
     setError(null)
 
     try {
-      const { createProposal, discardDraft } = await import('@/lib/api/client')
+      const { createProposal, updateProposal, discardDraft } = await import('@/lib/api/client')
 
       const skillsArr = formData.skills
         ? formData.skills.split(',').map((s) => s.trim()).filter(Boolean)
         : []
 
-      await createProposal({
+      const proposalData = {
         title: formData.title.trim(),
         description: formData.description.trim(),
         budget: formData.budget?.trim() || undefined,
@@ -257,13 +341,19 @@ function NewProposalPageContent() {
         client_name: jobContext?.company,
         strategy_id: selectedStrategyId || undefined,
         generated_with_ai: false,
-        status: 'submitted',
-      })
+        status: saveAsDraft ? 'draft' : 'submitted',
+      }
+
+      if (editId) {
+        await updateProposal(editId, proposalData)
+      } else {
+        await createProposal(proposalData)
+      }
 
       // Clear draft so it doesn't appear in recovery
-      discardDraft('proposal', 'new').catch(() => {})
+      discardDraft('proposal', draftId).catch(() => {})
 
-      toast.success('Proposal submitted successfully!')
+      toast.success(saveAsDraft ? 'Draft saved successfully!' : 'Proposal submitted successfully!')
       router.push('/proposals')
     } catch (err: unknown) {
       const message =
@@ -321,7 +411,7 @@ function NewProposalPageContent() {
     }
   }
 
-  if (!isInitialized) {
+  if (!isInitialized || !isLoaded) {
     return (
       <PageContainer>
         <PageHeader title="New Proposal" />
@@ -346,10 +436,10 @@ function NewProposalPageContent() {
       <Breadcrumb
         items={[
           { label: 'Proposals', href: '/proposals' },
-          { label: 'New Proposal' },
+          { label: editId ? 'Edit Proposal' : 'New Proposal' },
         ]}
       />
-      <PageHeader title="New Proposal">
+      <PageHeader title={editId ? 'Edit Proposal' : 'New Proposal'}>
         <AutoSaveIndicator
           status={saveStatus}
           lastSaved={lastSaved}
@@ -358,6 +448,18 @@ function NewProposalPageContent() {
           onManualSave={saveNow}
         />
       </PageHeader>
+
+      {/* Missing Job Context Warning */}
+      {!jobContext && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
+          <p className="font-medium flex items-center gap-2">
+            <span>⚠️</span> No job reference linked
+          </p>
+          <p className="mt-1">
+            You are creating a standalone proposal. For a better experience with AI generation tailored to a specific job, we recommend starting from the <Button variant="link" className="h-auto p-0 text-amber-800 dark:text-amber-200 underline font-medium" onClick={() => router.push('/projects')}>Projects</Button> page.
+          </p>
+        </div>
+      )}
 
       {/* Step indicators */}
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -450,19 +552,79 @@ function NewProposalPageContent() {
               )}
             </div>
           </div>
+        </CardContent>
+        </Card>
+      )}
 
-          <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-900 space-y-2">
-            <p className="text-xs text-blue-700 dark:text-blue-300">
-              💡 Your proposal is tailored to this job using AI, your knowledge base, and your selected strategy.
-            </p>
+      {/* AI Generate Feature Banner */}
+      {jobContext && (
+        <Card className="border-2 border-primary/20 bg-linear-to-br from-primary/5 via-primary/3 to-transparent dark:from-primary/10 dark:via-primary/5 shadow-sm">
+          <CardHeader className="pb-3">
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1 flex-1">
+                <h3 className="text-lg font-bold flex items-center gap-2 text-primary">
+                  <span className="text-2xl">✨</span>
+                  AI-Powered Proposal Generator
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Let AI craft a personalized, winning proposal using your knowledge base and selected strategy.
+                </p>
+              </div>
+              <Button
+                type="button"
+                size="lg"
+                className="shimmer-button min-w-40 gap-2 shadow-lg hover:shadow-xl transition-all"
+                onClick={handleAIGenerate}
+                disabled={isAIGenerating}
+              >
+                {isAIGenerating ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin shrink-0" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <span className="text-lg">✨</span>
+                    AI Generate
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1.5 bg-background/50 px-2.5 py-1.5 rounded">
+                <span>🎯</span>
+                <span>Tailored to job requirements</span>
+              </div>
+              <div className="flex items-center gap-1.5 bg-background/50 px-2.5 py-1.5 rounded">
+                <span>📚</span>
+                <span>Uses your knowledge base</span>
+              </div>
+              <div className="flex items-center gap-1.5 bg-background/50 px-2.5 py-1.5 rounded">
+                <span>🎨</span>
+                <span>Applies your strategy</span>
+              </div>
+              <div className="flex items-center gap-1.5 bg-background/50 px-2.5 py-1.5 rounded">
+                <span>⚡</span>
+                <span>Saves you hours</span>
+              </div>
+            </div>
+            {aiError && (
+              <div className="mt-3 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+                <p className="text-sm text-destructive" role="alert">
+                  {aiError}
+                </p>
+              </div>
+            )}
             {strategies.length > 0 && (
-              <div className="flex items-center gap-2 flex-wrap">
-                <Label className="text-xs font-medium text-blue-800 dark:text-blue-200">Strategy:</Label>
+              <div className="mt-3 pt-3 border-t flex items-center gap-3">
+                <Label className="text-xs font-medium whitespace-nowrap">Strategy:</Label>
                 <Select
                   value={selectedStrategyId || ''}
                   onValueChange={(v) => setSelectedStrategyId(v || null)}
                 >
-                  <SelectTrigger className="w-[180px] h-8 text-xs border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-800 text-blue-900 dark:text-blue-100">
+                  <SelectTrigger className="w-50 h-9 text-xs">
                     <SelectValue placeholder="Select strategy" />
                   </SelectTrigger>
                   <SelectContent>
@@ -473,15 +635,15 @@ function NewProposalPageContent() {
                     ))}
                   </SelectContent>
                 </Select>
+                <span className="text-xs text-muted-foreground">Choose the tone and approach for your proposal</span>
               </div>
             )}
-          </div>
-        </CardContent>
+          </CardContent>
         </Card>
       )}
 
       {/* Proposal Form */}
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={(e) => handleSubmit(e, false)} className="space-y-6">
         {/* Title */}
         <div>
           <Label htmlFor="title">Proposal Title *</Label>
@@ -498,32 +660,7 @@ function NewProposalPageContent() {
 
         {/* Description */}
         <div>
-          <div className="flex items-center justify-between mb-2">
-            <Label htmlFor="description">Description *</Label>
-            {jobContext && (
-              <Button
-                type="button"
-                variant="link"
-                className="h-auto p-0 text-sm gap-1.5"
-                onClick={handleAIGenerate}
-                disabled={isAIGenerating}
-              >
-                {isAIGenerating ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin shrink-0" />
-                    Generating...
-                  </>
-                ) : (
-                  <>✨ AI Generate</>
-                )}
-              </Button>
-            )}
-          </div>
-          {aiError && (
-            <p className="text-sm text-destructive mb-2" role="alert">
-              {aiError}
-            </p>
-          )}
+          <Label htmlFor="description">Description *</Label>
           <Textarea
             id="description"
             value={formData.description}
@@ -541,25 +678,29 @@ function NewProposalPageContent() {
         {/* Budget & Timeline */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="budget">Budget *</Label>
+            <Label htmlFor="budget" className="flex items-center gap-1.5">
+              Budget
+              <span className="text-xs font-normal text-muted-foreground">(optional)</span>
+            </Label>
             <Input
               type="text"
               id="budget"
               value={formData.budget}
               onChange={(e) => handleChange('budget', e.target.value)}
-              required
               placeholder="e.g., $5,000 - $10,000"
               className="mt-2"
             />
           </div>
           <div>
-            <Label htmlFor="timeline">Timeline *</Label>
+            <Label htmlFor="timeline" className="flex items-center gap-1.5">
+              Timeline
+              <span className="text-xs font-normal text-muted-foreground">(optional)</span>
+            </Label>
             <Input
               type="text"
               id="timeline"
               value={formData.timeline}
               onChange={(e) => handleChange('timeline', e.target.value)}
-              required
               placeholder="e.g., 4-6 weeks"
               className="mt-2"
             />
@@ -568,7 +709,10 @@ function NewProposalPageContent() {
 
         {/* Skills */}
         <div>
-          <Label htmlFor="skills">Required Skills</Label>
+          <Label htmlFor="skills" className="flex items-center gap-1.5">
+            Required Skills
+            <span className="text-xs font-normal text-muted-foreground">(optional)</span>
+          </Label>
           <Input
             type="text"
             id="skills"
@@ -577,6 +721,9 @@ function NewProposalPageContent() {
             placeholder="e.g., React, TypeScript, Node.js (comma-separated)"
             className="mt-2"
           />
+          <p className="text-xs text-muted-foreground mt-1">
+            💡 These skills help the AI emphasize your expertise during generation.
+          </p>
         </div>
 
         {/* Actions */}
@@ -592,13 +739,28 @@ function NewProposalPageContent() {
                 Submitting...
               </>
             ) : (
-              'Submit Proposal'
+              editId ? 'Update Proposal' : 'Submit Proposal'
+            )}
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={(e) => handleSubmit(e as any, true)}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin shrink-0 mr-2" />
+                Saving...
+              </>
+            ) : (
+              'Save as Draft'
             )}
           </Button>
           <Button
             type="button"
             variant="outline"
-            onClick={() => router.push('/proposals')}
+            onClick={() => router.push(editId ? `/proposals/${editId}` : '/proposals')}
           >
             Cancel
           </Button>
@@ -616,10 +778,10 @@ function NewProposalPageContent() {
         <CardContent className="pt-6">
           <p className="font-medium mb-2">💡 How this works</p>
           <ul className="space-y-1 list-disc list-inside text-sm text-muted-foreground">
-            <li><strong>Fill manually</strong> or use <strong>✨ AI Generate</strong> to auto-fill from the job + your knowledge base + strategy</li>
-            <li><strong>Strategy</strong> (in Job Reference): Controls tone and focus. Create strategies under Strategies in the sidebar.</li>
-            <li><strong>Submit Proposal</strong> saves to Proposals and links it to this job</li>
-            <li>Auto-save keeps drafts; drafts recoverable for 24h</li>
+            <li><strong>AI Generate</strong>: Auto-fill using job details + your knowledge base + selected strategy</li>
+            <li><strong>Auto-save</strong>: Your work is automatically saved every few seconds while you type</li>
+            <li><strong>Save as Draft</strong>: Save to Proposals → Drafts tab for later completion</li>
+            <li><strong>Submit Proposal</strong>: Mark as submitted and link to the job</li>
           </ul>
         </CardContent>
       </Card>

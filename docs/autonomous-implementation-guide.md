@@ -1126,7 +1126,7 @@ from app.config import settings
 from app.workflows.bidding_workflow import autonomous_workflow
 
 celery_app = Celery(
-    'autobidder',
+    'auto_bidder',
     broker=settings.celery_broker_url,
     backend=settings.celery_result_backend
 )

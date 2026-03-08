@@ -74,6 +74,12 @@ async def get_document(document_id: str, current_user: UserResponse = Depends(ge
 async def upload_document(
     file: UploadFile = File(...),
     collection: str = Query(..., description="Collection type (case_studies, team_profiles, etc.)"),
+    title: Optional[str] = Query(None, max_length=200, description="Document title"),
+    supplemental_info: Optional[str] = Query(None, description="Additional context to embed with document"),
+    reference_url: Optional[str] = Query(None, description="Optional reference URL (company website, etc.)"),
+    email: Optional[str] = Query(None, description="Optional contact email"),
+    phone: Optional[str] = Query(None, description="Optional contact phone"),
+    contact_url: Optional[str] = Query(None, description="Optional contact URL (LinkedIn, etc.)"),
     current_user: UserResponse = Depends(get_current_user),
 ) -> Document:
     """
@@ -82,6 +88,12 @@ async def upload_document(
     Args:
         file: File to upload
         collection: Collection type
+        title: Document title (defaults to filename without extension)
+        supplemental_info: Additional context to embed with document
+        reference_url: Optional reference URL
+        email: Optional contact email
+        phone: Optional contact phone
+        contact_url: Optional contact URL
         current_user: Authenticated user from JWT token
 
     Returns:
@@ -103,8 +115,14 @@ async def upload_document(
         document = await document_service.upload_document(
             user_id=user_id,
             file_content=file_content,
+            title=title,
+            supplemental_info=supplemental_info,
             filename=file.filename or "unknown",
             collection=collection,
+            reference_url=reference_url,
+            email=email,
+            phone=phone,
+            contact_url=contact_url,
         )
 
         return document

@@ -28,18 +28,11 @@ const navigation = [
 
 export function AppSidebar() {
   const pathname = usePathname()
-  const { isOnline, updateNavigation, canGoBack, goBack } = useSessionState()
+  const { isOnline, canGoBack, goBack } = useSessionState()
   const { mobileOpen, closeMobile } = useSidebar()
 
-  const handleNavigation = async (href: string, _e: React.MouseEvent) => {
-    // Let Next.js handle the navigation, but track it in session state
-    // Don't prevent default - we want normal browser behavior
-    try {
-      await updateNavigation(href)
-    } catch (error) {
-      console.error('Error updating session state on navigation:', error)
-    }
-  }
+  // Session state is updated by route-tracking effect in WorkflowProvider when pathname changes.
+  // Don't call updateNavigation here - it caused duplicate API calls (sidebar click + effect both firing).
 
   const navLinks = (
     <>
@@ -59,10 +52,7 @@ export function AppSidebar() {
           <Link
             key={item.name}
             href={item.href}
-            onClick={(e) => {
-              handleNavigation(item.href, e)
-              closeMobile()
-            }}
+            onClick={() => closeMobile()}
             className={cn(
               'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
               isActive

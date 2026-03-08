@@ -1,6 +1,6 @@
 /**
  * Document List Component
- * 
+ *
  * Displays a list of knowledge base documents with actions.
  */
 
@@ -70,27 +70,63 @@ export function DocumentList({ documents, onDelete, onReprocess }: DocumentListP
                 {document.chunk_count > 0 && (
                   <>
                     <span>Chunks: {document.chunk_count}</span>
-                    <span>Tokens: {document.chunk_count.toLocaleString()}</span>
+                    <span>Tokens: {document.token_count.toLocaleString()}</span>
                   </>
                 )}
                 {document.retrieval_count > 0 && (
                   <span>Retrieved: {document.retrieval_count} times</span>
                 )}
               </div>
+
+              {/* Contact & Reference Information */}
+              {(document.reference_url || document.email || document.phone || document.contact_url) && (
+                <div className="mt-3 pt-3 border-t dark:border-slate-700 space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground mb-1">Contact & Reference:</p>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                    {document.reference_url && (
+                      <a
+                        href={document.reference_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline dark:text-blue-400 flex items-center gap-1"
+                      >
+                        🔗 Reference
+                      </a>
+                    )}
+                    {document.email && (
+                      <a
+                        href={`mailto:${document.email}`}
+                        className="text-blue-600 hover:underline dark:text-blue-400 flex items-center gap-1"
+                      >
+                        📧 {document.email}
+                      </a>
+                    )}
+                    {document.phone && (
+                      <a
+                        href={`tel:${document.phone}`}
+                        className="text-blue-600 hover:underline dark:text-blue-400 flex items-center gap-1"
+                      >
+                        📞 {document.phone}
+                      </a>
+                    )}
+                    {document.contact_url && (
+                      <a
+                        href={document.contact_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline dark:text-blue-400 flex items-center gap-1"
+                      >
+                        👤 Profile
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {document.processing_error && (
                 <div className="mt-2 rounded-md bg-red-50 p-2 text-sm text-red-800 dark:bg-red-900/20 dark:text-red-200">
                   Error: {document.processing_error}
                 </div>
-              )}
-              {document.file_url && (
-                <a
-                  href={document.file_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-2 inline-block text-sm text-blue-600 hover:underline dark:text-blue-400"
-                >
-                  Download file
-                </a>
               )}
             </div>
             <div className="flex flex-wrap items-center gap-2 shrink-0">

@@ -1,6 +1,6 @@
 /**
  * Knowledge Base Type Definitions
- * 
+ *
  * Type definitions for knowledge base document management feature.
  */
 
@@ -13,6 +13,7 @@ export type ProcessingStatus = 'pending' | 'processing' | 'completed' | 'failed'
 export interface Document {
   id: string
   user_id: string
+  title?: string | null
   filename: string
   file_type: DocumentFileType
   file_size_bytes: number
@@ -28,6 +29,11 @@ export interface Document {
   processed_at: string | null
   created_at: string
   updated_at: string
+  // Optional contact and reference fields
+  reference_url?: string | null
+  email?: string | null
+  phone?: string | null
+  contact_url?: string | null
 }
 
 export interface DocumentFilters {

@@ -1,7 +1,7 @@
 /**
  * useAutoSave Hook
- * 
- * Implements automatic draft saving with debounced onChange (300ms) 
+ *
+ * Implements automatic draft saving with debounced onChange (300ms)
  * and periodic checkpoint (10 seconds).
  */
 
@@ -59,6 +59,11 @@ export function useAutoSave(options: UseAutoSaveOptions): UseAutoSaveReturn {
   const lastDataRef = useRef<string>(JSON.stringify(data))
   const isSavingRef = useRef(false)
   const savePromiseRef = useRef<Promise<void> | null>(null)
+  const dataRef = useRef(data)
+  const lastSaveFailureTimeRef = useRef<number>(0)
+  const FAILURE_BACKOFF_MS = 15000 // Don't retry for 15s after a failure
+
+  dataRef.current = data
 
   /**
    * Perform save operation
@@ -66,14 +71,20 @@ export function useAutoSave(options: UseAutoSaveOptions): UseAutoSaveReturn {
   const performSave = useCallback(async () => {
     if (!enabled) return
 
+    // Back off after a recent failure to avoid infinite retry loops
+    const now = Date.now()
+    if (now - lastSaveFailureTimeRef.current < FAILURE_BACKOFF_MS) {
+      return
+    }
+
     // Wait for any in-flight save to complete first
     if (isSavingRef.current && savePromiseRef.current) {
       await savePromiseRef.current
     }
 
-    // Check if data actually changed
-    const currentDataStr = JSON.stringify(data)
-    if (currentDataStr === lastDataRef.current && status !== 'idle') {
+    const currentData = dataRef.current
+    const currentDataStr = JSON.stringify(currentData)
+    if (currentDataStr === lastDataRef.current) {
       return
     }
 
@@ -84,36 +95,37 @@ export function useAutoSave(options: UseAutoSaveOptions): UseAutoSaveReturn {
     const savePromise = (async () => {
       try {
         const result = await draftManager.saveDraft({
-        entityType,
-        entityId,
-        draftData: data,
-        version: currentVersion,
-        enableCache: true,
-      })
+          entityType,
+          entityId,
+          draftData: currentData,
+          version: currentVersion,
+          enableCache: true,
+        })
 
-      if (result) {
-        setCurrentVersion(result.draftVersion)
-        setLastSaved(new Date())
-        setStatus('saved')
-        setHasUnsavedChanges(false)
-        lastDataRef.current = currentDataStr
+        if (result) {
+          setCurrentVersion(result.draftVersion)
+          setLastSaved(new Date())
+          setStatus('saved')
+          setHasUnsavedChanges(false)
+          lastDataRef.current = currentDataStr
 
-        if (onSaveSuccess) {
-          onSaveSuccess(result)
+          if (onSaveSuccess) {
+            onSaveSuccess(result)
+          }
+
+          // Reset to idle after 2 seconds
+          setTimeout(() => {
+            setStatus((prev) => (prev === 'saved' ? 'idle' : prev))
+          }, 2000)
         }
-
-        // Reset to idle after 2 seconds
-        setTimeout(() => {
-          setStatus((prev) => (prev === 'saved' ? 'idle' : prev))
-        }, 2000)
-      }
       } catch (err: any) {
         console.error('Auto-save failed:', err)
-        
-        const errorMessage = err.type === 'conflict' 
+        lastSaveFailureTimeRef.current = Date.now()
+
+        const errorMessage = err.type === 'conflict'
           ? 'Version conflict - please refresh and try again'
           : 'Failed to save draft'
-        
+
         setError(errorMessage)
         setStatus('error')
 
@@ -134,7 +146,7 @@ export function useAutoSave(options: UseAutoSaveOptions): UseAutoSaveReturn {
 
     savePromiseRef.current = savePromise
     await savePromise
-  }, [enabled, data, entityType, entityId, currentVersion, onSaveSuccess, onSaveError, status])
+  }, [enabled, entityType, entityId, currentVersion, onSaveSuccess, onSaveError])
 
   /**
    * Manual save trigger
@@ -144,7 +156,7 @@ export function useAutoSave(options: UseAutoSaveOptions): UseAutoSaveReturn {
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current)
     }
-    
+
     await performSave()
   }, [performSave])
 
@@ -155,7 +167,12 @@ export function useAutoSave(options: UseAutoSaveOptions): UseAutoSaveReturn {
     if (!enabled) return
 
     const currentDataStr = JSON.stringify(data)
-    
+
+    // Skip scheduling when in failure backoff to avoid retry loops
+    if (Date.now() - lastSaveFailureTimeRef.current < FAILURE_BACKOFF_MS) {
+      return
+    }
+
     // Check if data changed
     if (currentDataStr !== lastDataRef.current) {
       setHasUnsavedChanges(true)
@@ -177,7 +194,8 @@ export function useAutoSave(options: UseAutoSaveOptions): UseAutoSaveReturn {
         clearTimeout(debounceTimerRef.current)
       }
     }
-  }, [data, enabled, debounceMs, performSave])
+  }, [data, enabled, debounceMs])
+  // Note: performSave is intentionally NOT in dependencies to avoid circular updates
 
   /**
    * Periodic checkpoint save (every 10 seconds)
@@ -198,7 +216,8 @@ export function useAutoSave(options: UseAutoSaveOptions): UseAutoSaveReturn {
         clearInterval(checkpointTimerRef.current)
       }
     }
-  }, [enabled, hasUnsavedChanges, checkpointIntervalMs, performSave])
+  }, [enabled, hasUnsavedChanges, checkpointIntervalMs])
+  // Note: performSave is intentionally NOT in dependencies to avoid circular updates
 
   /**
    * Save before page unload
@@ -222,7 +241,8 @@ export function useAutoSave(options: UseAutoSaveOptions): UseAutoSaveReturn {
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload)
     }
-  }, [enabled, hasUnsavedChanges, performSave])
+  }, [enabled, hasUnsavedChanges])
+  // Note: performSave is intentionally NOT in dependencies to avoid circular updates
 
   return {
     status,

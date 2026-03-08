@@ -1,8 +1,7 @@
 /**
  * Proposals Page
  * 
- * Lists user proposals with filters and state preservation.
- * Integrates with session context for seamless navigation.
+ * Lists user proposals with tabs, filters and delete functionality.
  */
 
 'use client'
@@ -16,22 +15,38 @@ import { PageHeader } from '@/components/shared/page-header'
 import { PageContainer } from '@/components/shared/page-container'
 import { EmptyState } from '@/components/shared/empty-state'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardFooter } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Trash2, Search, Filter, Calendar, DollarSign, Clock, Briefcase } from 'lucide-react'
+import { deleteProposal } from '@/lib/api/client'
+import { useToast } from '@/lib/toast/toast-context'
+import { cn } from '@/lib/utils'
 
 interface ProposalFilters {
   search: string
   status: string
   sortBy: string
+  platform: string
 }
+
+const STATUS_TABS = [
+  { id: 'all', label: 'All' },
+  { id: 'draft', label: 'Drafts' },
+  { id: 'submitted', label: 'Submitted' },
+  { id: 'won', label: 'Won' },
+  { id: 'lost', label: 'Lost' },
+  { id: 'archived', label: 'Archived' },
+]
 
 export default function ProposalsPage() {
   const router = useRouter()
+  const toast = useToast()
   const { getFilters, setFilters, getScrollPosition, setScrollPosition, updateActiveEntity } = useSessionState()
   const { measureOperation } = useNavigationTiming()
   const [isLoading, setIsLoading] = useState(true)
   const [proposals, setProposals] = useState<any[]>([])
+  const [isDeleting, setIsDeleting] = useState<string | null>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   // Get saved filters from session state
@@ -40,83 +55,72 @@ export default function ProposalsPage() {
     search: savedFilters.search || '',
     status: savedFilters.status || 'all',
     sortBy: savedFilters.sortBy || 'created',
+    platform: savedFilters.platform || 'all',
   })
 
-  // Load data and restore scroll position
-  useEffect(() => {
-    async function loadData() {
-      setIsLoading(true)
-      
-      try {
-        await measureOperation('load-proposals', async () => {
-          const { listProposals } = await import('@/lib/api/client')
-          
-          // Fetch proposals from API
-          const statusFilter = filters.status === 'all' ? undefined : filters.status
-          const response = await listProposals(statusFilter, 50, 0)
-          
-          // Apply search filter if present
-          let filteredProposals = response.proposals
-          if (filters.search) {
-            const searchLower = filters.search.toLowerCase()
-            filteredProposals = filteredProposals.filter(p => 
-              p.title.toLowerCase().includes(searchLower) ||
-              (p.description && p.description.toLowerCase().includes(searchLower))
-            )
-          }
-          
-          // Apply sorting
-          const sorted = [...filteredProposals].sort((a, b) => {
-            switch (filters.sortBy) {
-              case 'created':
-                return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-              case 'updated':
-                return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-              case 'title':
-                return a.title.localeCompare(b.title)
-              default:
-                return 0
-            }
-          })
-          
-          setProposals(sorted)
-        })
-      } catch (error) {
-        console.error('Error loading proposals:', error)
-        setProposals([])
-      } finally {
-        setIsLoading(false)
-      }
-    }
+  // Load data
+  const loadData = async () => {
+    setIsLoading(true)
+    try {
+      await measureOperation('load-proposals', async () => {
+        const { listProposals } = await import('@/lib/api/client')
+        
+        const statusFilter = filters.status === 'all' ? undefined : filters.status
+        const response = await listProposals(statusFilter, 100, 0)
+        
+        let filtered = response.proposals
 
-    loadData()
-
-    // Restore scroll position after content loads
-    const restoreScroll = async () => {
-      if (scrollContainerRef.current) {
-        const savedPosition = getScrollPosition('/proposals')
-        if (savedPosition > 0) {
-          scrollContainerRef.current.scrollTop = savedPosition
+        // Apply Search
+        if (filters.search) {
+          const searchLower = filters.search.toLowerCase()
+          filtered = filtered.filter(p => 
+            p.title.toLowerCase().includes(searchLower) ||
+            (p.description && p.description.toLowerCase().includes(searchLower))
+          )
         }
+
+        // Apply Platform Filter
+        if (filters.platform !== 'all') {
+          filtered = filtered.filter(p => p.job_platform?.toLowerCase() === filters.platform.toLowerCase())
+        }
+        
+        // Apply Sorting
+        const sorted = [...filtered].sort((a, b) => {
+          switch (filters.sortBy) {
+            case 'created':
+              return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            case 'updated':
+              return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+            case 'title':
+              return a.title.localeCompare(b.title)
+            default:
+              return 0
+          }
+        })
+        
+        setProposals(sorted)
+      })
+    } catch (error) {
+      console.error('Error loading proposals:', error)
+      setProposals([])
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadData()
+  }, [filters.status, filters.sortBy, filters.platform]) // Reload on key filter changes
+
+  // Restoring scroll position
+  useEffect(() => {
+    if (!isLoading && scrollContainerRef.current) {
+      const savedPosition = getScrollPosition('/proposals')
+      if (savedPosition > 0) {
+        scrollContainerRef.current.scrollTop = savedPosition
       }
     }
-
-    restoreScroll()
-  }, [filters])
-
-  // Save scroll position on scroll
-  useEffect(() => {
-    const container = scrollContainerRef.current
-    if (!container) return
-
-    const handleScroll = () => {
-      const position = container.scrollTop
-      setScrollPosition(position)
-    }
-
-    container.addEventListener('scroll', handleScroll)
-    return () => container.removeEventListener('scroll', handleScroll)
-  }, [setScrollPosition])
+  }, [isLoading])
 
   // Save filters when they change
   useEffect(() => {
@@ -128,6 +132,22 @@ export default function ProposalsPage() {
     router.push(`/proposals/${proposalId}`)
   }
 
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
+    if (!confirm('Are you sure you want to delete this proposal?')) return
+
+    setIsDeleting(id)
+    try {
+      await deleteProposal(id)
+      toast.success('Proposal deleted')
+      setProposals(prev => prev.filter(p => p.id !== id))
+    } catch (error) {
+      toast.error('Failed to delete')
+    } finally {
+      setIsDeleting(null)
+    }
+  }
+
   const handleNewProposal = () => {
     router.push('/proposals/new')
   }
@@ -135,10 +155,7 @@ export default function ProposalsPage() {
   if (isLoading) {
     return (
       <PageContainer>
-        <PageHeader
-          title="Proposals"
-          description="Create and manage your project proposals"
-        />
+        <PageHeader title="Proposals" description="Manage your AI-powered proposals" />
         <div className="space-y-6">
           <LoadingSkeleton lines={1} />
           <CardListSkeleton count={5} />
@@ -148,57 +165,87 @@ export default function ProposalsPage() {
   }
 
   return (
-    <PageContainer ref={scrollContainerRef} className="space-y-6">
-      <PageHeader
-        title="Proposals"
-        description="Create and manage your project proposals"
-      >
-        <Button onClick={handleNewProposal}>New Proposal</Button>
+    <PageContainer ref={scrollContainerRef} className="space-y-6 pb-20">
+      <PageHeader title="Proposals" description="Manage and track your proposal workflow">
+        <Button onClick={handleNewProposal} className="shimmer-button">New Proposal</Button>
       </PageHeader>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <Input
-          type="text"
-          placeholder="Search proposals..."
-          value={filters.search}
-          onChange={(e) => setLocalFilters({ ...filters, search: e.target.value })}
-          className="flex-1"
-        />
-        <select
-          value={filters.status}
-          onChange={(e) => setLocalFilters({ ...filters, status: e.target.value })}
-          className="rounded-md border border-input bg-background px-3 py-2 text-sm"
-        >
-          <option value="all">All Status</option>
-          <option value="draft">Draft</option>
-          <option value="submitted">Submitted</option>
-          <option value="responded">Responded</option>
-          <option value="won">Won</option>
-          <option value="lost">Lost</option>
-          <option value="archived">Archived</option>
-        </select>
-
-        <select
-          value={filters.sortBy}
-          onChange={(e) => setLocalFilters({ ...filters, sortBy: e.target.value })}
-          className="rounded-md border border-input bg-background px-3 py-2 text-sm"
-        >
-          <option value="created">Date Created</option>
-          <option value="updated">Last Updated</option>
-          <option value="title">Title</option>
-        </select>
+      {/* Tabs with premium styling */}
+      <div className="flex items-center gap-1 border-b border-slate-200 dark:border-slate-800 overflow-x-auto no-scrollbar">
+        {STATUS_TABS.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setLocalFilters({ ...filters, status: tab.id })}
+            className={cn(
+              "px-4 py-3 text-sm font-medium transition-all relative whitespace-nowrap",
+              filters.status === tab.id 
+                ? "text-primary border-b-2 border-primary" 
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {tab.label}
+            {filters.status === tab.id && (
+              <span className="absolute -bottom-[2px] left-0 w-full h-[2px] bg-primary animate-in fade-in slide-in-from-left-2 duration-300" />
+            )}
+          </button>
+        ))}
       </div>
 
-      {/* Proposals List */}
+      {/* Advanced Filters */}
+      <div className="flex flex-col lg:flex-row gap-4 items-center">
+        <div className="relative flex-1 w-full">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Search by title or description..."
+            value={filters.search}
+            onChange={(e) => setLocalFilters({ ...filters, search: e.target.value })}
+            onKeyDown={(e) => e.key === 'Enter' && loadData()}
+            className="pl-10 h-10 bg-white dark:bg-slate-900"
+          />
+        </div>
+        
+        <div className="flex gap-2 w-full lg:w-auto">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-md border text-sm bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <select
+              value={filters.platform}
+              onChange={(e) => setLocalFilters({ ...filters, platform: e.target.value })}
+              className="bg-transparent border-none outline-none focus:ring-0 cursor-pointer min-w-[100px]"
+            >
+              <option value="all">Platforms</option>
+              <option value="upwork">Upwork</option>
+              <option value="freelancer">Freelancer</option>
+              <option value="huggingface">HuggingFace</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-md border text-sm bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
+            <Clock className="h-4 w-4 text-muted-foreground" />
+            <select
+              value={filters.sortBy}
+              onChange={(e) => setLocalFilters({ ...filters, sortBy: e.target.value })}
+              className="bg-transparent border-none outline-none focus:ring-0 cursor-pointer min-w-[100px]"
+            >
+              <option value="created">Newest First</option>
+              <option value="updated">Recently Updated</option>
+              <option value="title">By Title</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Proposals list with premium card styling */}
       <div className="grid gap-4">
         {proposals.length === 0 ? (
           <EmptyState
-            title="No proposals found"
-            description="Create your first proposal to start winning freelance projects."
-            icon={<span className="text-4xl">📝</span>}
+            title="No proposals matching filters"
+            description="Try adjusting your search or filters to find what you're looking for."
+            icon={<Briefcase className="h-10 w-10 text-muted-foreground" />}
             action={
-              <Button onClick={handleNewProposal}>Create First Proposal</Button>
+              <Button variant="outline" onClick={() => setLocalFilters({ ...filters, search: '', status: 'all', platform: 'all' })}>
+                Clear All Filters
+              </Button>
             }
           />
         ) : (
@@ -206,32 +253,67 @@ export default function ProposalsPage() {
             <Card
               key={proposal.id}
               onClick={() => handleProposalClick(proposal.id)}
-              className="cursor-pointer transition-all hover:shadow-md hover:border-primary/50"
+              className="group cursor-pointer transition-all duration-300 hover:shadow-lg hover:border-primary/30 border-slate-200 dark:border-slate-800 overflow-hidden relative"
             >
-              <CardContent className="pt-6">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <h3 className="font-semibold text-lg">{proposal.title}</h3>
-                  <Badge
-                    variant={proposal.status === 'won' ? 'default' : proposal.status === 'lost' ? 'destructive' : 'secondary'}
-                    className="capitalize shrink-0"
-                  >
-                    {proposal.status}
-                  </Badge>
+              {/* Highlight bar on the left */}
+              <div className={cn(
+                "absolute left-0 top-0 w-1 h-full transition-all group-hover:w-1.5",
+                proposal.status === 'won' ? "bg-green-500" :
+                proposal.status === 'lost' ? "bg-red-500" :
+                proposal.status === 'draft' ? "bg-slate-400" : "bg-primary"
+              )} />
+              
+              <CardContent className="p-5 md:p-6">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="flex-1 space-y-1">
+                    <div className="flex items-center gap-3">
+                      <h3 className="font-bold text-lg group-hover:text-primary transition-colors line-clamp-1">
+                        {proposal.title}
+                      </h3>
+                      <Badge
+                        variant={proposal.status === 'won' ? 'default' : proposal.status === 'lost' ? 'destructive' : 'secondary'}
+                        className="capitalize px-2 py-0 text-[10px]"
+                      >
+                        {proposal.status}
+                      </Badge>
+                    </div>
+                    {proposal.description && (
+                      <p className="text-sm text-muted-foreground line-clamp-1 max-w-2xl">
+                        {proposal.description}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:bg-destructive/10"
+                      onClick={(e) => handleDelete(e, proposal.id)}
+                      disabled={isDeleting === proposal.id}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-                {proposal.description && (
-                  <p className="mt-2 text-sm text-muted-foreground line-clamp-2">
-                    {proposal.description}
-                  </p>
-                )}
-                <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                  {proposal.budget && <span>💰 {proposal.budget}</span>}
-                  {proposal.timeline && <span>📅 {proposal.timeline}</span>}
-                  {'job_title' in proposal && proposal.job_title && (
-                    <span className="truncate max-w-[200px]" title={proposal.job_title}>
-                      📎 {proposal.job_title}
-                    </span>
+
+                <div className="mt-4 pt-4 border-t flex flex-wrap items-center gap-y-2 gap-x-6 text-xs font-medium text-slate-500 dark:text-slate-400">
+                  {proposal.budget && (
+                    <div className="flex items-center gap-1.5">
+                      <DollarSign className="h-3.5 w-3.5 text-green-600" />
+                      {proposal.budget}
+                    </div>
                   )}
-                  <span>Created {new Date(proposal.created_at).toLocaleDateString()}</span>
+                  {proposal.job_platform && (
+                    <div className="flex items-center gap-1.5">
+                      <Briefcase className="h-3.5 w-3.5 text-blue-600" />
+                      <span className="capitalize">{proposal.job_platform}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5" />
+                    {new Date(proposal.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </div>
                 </div>
               </CardContent>
             </Card>

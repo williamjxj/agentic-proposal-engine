@@ -18,7 +18,7 @@ An AI-powered auto-bidding platform that reduces proposal writing time from 30 m
 
 ### Proposal Builder
 <!-- ![Proposal Builder](./assets/images/proposal-builder.png) -->
-*Coming soon: AI-powered proposal generation interface*
+*AI-powered proposal generation with RAG, structured job context, and one-click email delivery*
 
 </div>
 
@@ -35,16 +35,19 @@ An AI-powered auto-bidding platform that reduces proposal writing time from 30 m
 ## 🎯 Core Features
 
 - **Automated Job Discovery**: Discover jobs from HuggingFace datasets (Projects → Discover Jobs); web scraping planned for production
-- **Smart Knowledge Base**: Upload portfolio documents, case studies, and team profiles for AI context
-- **AI Proposal Generation**: Generate personalized, evidence-based proposals in under 60 seconds
-- **Bidding Strategies**: Create reusable AI prompt templates for different proposal styles
-- **Keyword Management**: Filter jobs based on your expertise and preferences
+- **Smart Knowledge Base**: Upload portfolio documents, case studies, and team profiles for AI context (RAG)
+- **AI Proposal Generation**: Generate personalized proposals using job description, structured job analysis, company context, your keywords, and RAG. One-click AI Generate in under 60 seconds
+- **Proposal Email Delivery**: Submit Proposal saves to DB and sends a formal HTML email to the customer via Resend (configurable recipient)
+- **Bidding Strategies**: Create reusable AI prompt templates for different proposal tones and focus areas
+- **Keyword Management**: Filter jobs and emphasize your skills in AI-generated proposals
 - **Analytics Dashboard**: Track win rates, platform performance, and time savings
 
 ### How It Works
 
-<!-- ![Workflow Diagram](./assets/images/workflow-diagram.png) -->
-*Diagram coming soon: 7-step proposal generation workflow*
+1. **Discover** jobs from HuggingFace (Projects → Discover) or browse persisted projects
+2. **Generate Proposal** — job context (title, description, company, structured analysis) loads via sessionStorage or API
+3. **AI Generate** — RAG (your portfolio) + job context + your keywords + strategy → tailored proposal draft
+4. **Submit Proposal** — saves to DB, sends formal HTML email to `PROPOSAL_SUBMIT_EMAIL` via Resend
 
 📄 **[View detailed workflow documentation](./docs/diagrams/workflow-diagram.md)**
 
@@ -69,13 +72,14 @@ This is a **full-stack monorepo** with two main components:
 
 ### Backend (Python FastAPI)
 
-- **Framework**: FastAPI 0.104+
+- **Framework**: FastAPI 0.109+
 - **Database**: PostgreSQL with asyncpg
 - **Auth**: JWT with bcrypt password hashing
-- **Vector DB**: ChromaDB for RAG
-- **RAG**: LangChain for document processing
+- **Vector DB**: ChromaDB (local persist mode recommended; Docker requires client upgrade)
+- **RAG**: LangChain for document processing and similarity search
 - **LLM**: OpenAI GPT-4-turbo / DeepSeek
-- **Job Discovery**: HuggingFace datasets (development); Playwright planned for production scraping
+- **Email**: Resend for proposal submission and job notifications
+- **Job Discovery**: HuggingFace datasets (e.g. `jacob-hugging-face/job-descriptions`); Playwright planned for production scraping
 
 ## 🚀 Quick Start
 
@@ -106,12 +110,10 @@ npm run dev  # Runs on :3000
 
 # Setup backend (new terminal)
 cd backend
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
+uv sync   # or: python -m venv venv && source venv/bin/activate && pip install -r requirements.txt
 cp .env.example .env
-# Edit .env with your API keys and JWT secret
-uvicorn app.main:app --reload --port 8000
+# Edit .env with API keys, JWT secret, RESEND_API_KEY (for proposal emails)
+uv run uvicorn app.main:app --reload --port 8000
 ```
 
 ### Environment Variables
@@ -123,10 +125,12 @@ uvicorn app.main:app --reload --port 8000
 
 **Backend** (`.env`):
 
-- `DATABASE_URL`: PostgreSQL connection string (default: postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/auto_bidder_dev)
+- `DATABASE_URL`: PostgreSQL connection string (e.g. `postgresql://postgres:postgres@127.0.0.1:5432/auto_bidder_dev`)
 - `JWT_SECRET`: Secret key for JWT tokens (generate with: `openssl rand -hex 32`)
-- `DEEPSEEK_API_KEY`: Your DeepSeek API key (or use OpenAI)
-- `CHROMA_PERSIST_DIR`: ChromaDB storage path (default: ./chroma_db)
+- `DEEPSEEK_API_KEY` or `OPENAI_API_KEY`: LLM provider API key
+- `CHROMA_PERSIST_DIR`: ChromaDB storage path (default: ./chroma_db). Use local mode; Docker ChromaDB requires client upgrade
+- `RESEND_API_KEY`: Resend.com API key for sending proposal emails
+- `PROPOSAL_SUBMIT_EMAIL`: Email address to receive submitted proposals (default: bestitconsultingca@gmail.com)
 
 ## 🔐 Security & Authentication
 
@@ -165,8 +169,9 @@ Documentation is in [`docs/`](./docs/). See [docs/readme.md](./docs/readme.md) f
 | [setup-and-run](./docs/setup-and-run.md) | Get the app running in ~10 minutes |
 | [setup-auth](./docs/setup-auth.md) | JWT and authentication setup |
 | [user-guides](./docs/user-guides.md) | How to start and use the app in the UI |
-| [proposal-workflow-ui](./docs/proposal-workflow-ui.md) | Discover Jobs → Generate Proposal flow |
+| [proposal-workflow-ui](./docs/proposal-workflow-ui.md) | Discover Jobs → Generate Proposal → Submit (with email) |
 | [huggingface-job-discovery](./docs/huggingface-job-discovery.md) | Job discovery (HuggingFace datasets) |
+| [chromadb-setup](./docs/chromadb-setup.md) | ChromaDB local vs Docker setup |
 | [web-scraping-status](./docs/web-scraping-status.md) | Web scraping status (not implemented) |
 | [diagrams/](./docs/diagrams/) | Architecture, auth, workflow diagrams |
 ```
@@ -250,18 +255,16 @@ See [docs/production-deployment.md](./docs/production-deployment.md) for detaile
 
 **Backend**:
 
-
-**Backend**:
-
 - Python 3.11+
-- FastAPI 0.104+
+- FastAPI 0.109+
 - PostgreSQL with asyncpg
 - JWT Authentication (python-jose + passlib)
-- ChromaDB 0.4+
-- LangChain 0.1+
+- ChromaDB 0.4+ (local persist) or 0.5+ (Docker HTTP)
+- LangChain for RAG and LLM
 - OpenAI GPT-4-turbo / DeepSeek
+- Resend for email (proposal submission, job notifications)
 - Playwright + BeautifulSoup
-- pypdf, python-docx
+- pypdf, python-docx, sentence-transformers
 
 **Infrastructure**:
 

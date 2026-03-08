@@ -36,11 +36,11 @@ export class DraftManager {
         await DraftCache.set(entityType, entityId, draftData)
       }
 
-      // Save to server
+      // Save to server (backend expects snake_case: draft_data, version)
       const entityIdParam = entityId || 'new'
       const result = await apiSaveDraft(entityType, entityIdParam, {
-        draftData,
-        expectedVersion: version,
+        draft_data: draftData,
+        version,
       })
 
       return result

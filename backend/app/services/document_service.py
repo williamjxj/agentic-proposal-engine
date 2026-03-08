@@ -62,25 +62,25 @@ class DocumentService:
                 query = "SELECT * FROM knowledge_base_documents WHERE user_id = $1"
                 params = [user_id]
                 param_count = 1
-                
+
                 if collection:
                     param_count += 1
                     query += f" AND collection = ${param_count}"
                     params.append(collection)
-                
+
                 if status:
                     param_count += 1
                     query += f" AND processing_status = ${param_count}"
                     params.append(status)
-                
+
                 query += " ORDER BY uploaded_at DESC"
-                
+
                 rows = await conn.fetch(query, *params)
-                
+
                 documents = []
                 for row in rows:
                     documents.append(self._row_to_document(dict(row)))
-                
+
                 return documents
         except Exception as e:
             logger.error(f"Failed to list documents: {e}")
@@ -111,10 +111,10 @@ class DocumentService:
                     document_id,
                     user_id
                 )
-                
+
                 if not row:
                     raise AutoBidderError(f"Document {document_id} not found")
-                
+
                 return self._row_to_document(dict(row))
         except AutoBidderError:
             raise
@@ -123,7 +123,17 @@ class DocumentService:
             raise AutoBidderError(f"Failed to get document: {e}")
 
     async def upload_document(
-        self, user_id: str, file_content: bytes, filename: str, collection: str
+        self,
+        user_id: str,
+        file_content: bytes,
+        filename: str,
+        collection: str,
+        title: Optional[str] = None,
+        supplemental_info: Optional[str] = None,
+        reference_url: Optional[str] = None,
+        email: Optional[str] = None,
+        phone: Optional[str] = None,
+        contact_url: Optional[str] = None
     ) -> Document:
         """
         Upload and process a document.
@@ -133,6 +143,12 @@ class DocumentService:
             file_content: File content as bytes
             filename: Original filename
             collection: Collection type (case_studies, team_profiles, etc.)
+            title: Document title (defaults to filename without extension)
+            supplemental_info: Additional context to embed with document (not stored in DB)
+            reference_url: Optional reference URL (company website, etc.)
+            email: Optional contact email
+            phone: Optional contact phone
+            contact_url: Optional contact URL (LinkedIn, etc.)
 
         Returns:
             Created Document object
@@ -162,9 +178,18 @@ class DocumentService:
             # Generate document ID
             document_id = str(uuid.uuid4())
 
-            # TODO: Implement file storage (local filesystem or S3)
-            # For now, files are processed in memory
-            file_url = None
+            # Use provided title or default to filename without extension
+            doc_title = title or Path(filename).stem
+
+            # Save file to local storage: backend/data/kb/{user_id}/{document_id}.{ext}
+            storage_dir = Path(settings.kb_storage_dir) / user_id
+            storage_dir.mkdir(parents=True, exist_ok=True)
+
+            file_path = storage_dir / f"{document_id}{file_ext}"
+            file_path.write_bytes(file_content)
+
+            # Store relative path for portability
+            file_url = f"data/kb/{user_id}/{document_id}{file_ext}"
 
             # Create document record
             pool = await get_db_pool()
@@ -172,30 +197,37 @@ class DocumentService:
                 row = await conn.fetchrow(
                     """
                     INSERT INTO knowledge_base_documents
-                    (id, user_id, filename, file_type, file_size_bytes, file_url, 
-                     collection, processing_status)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                    (id, user_id, title, filename, file_type, file_size_bytes, file_url,
+                     collection, processing_status, reference_url, email, phone, contact_url)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
                     RETURNING *
                     """,
                     document_id,
                     user_id,
+                    doc_title,
                     filename,
                     file_type,
                     file_size,
                     file_url,
                     collection,
-                    "pending"
+                    "pending",
+                    reference_url,
+                    email,
+                    phone,
+                    contact_url
                 )
-                
+
                 if not row:
                     raise AutoBidderError("Failed to create document record")
-                
+
                 document = self._row_to_document(dict(row))
 
             # Process document asynchronously (in background)
             # For now, we'll process it immediately, but in production this should be a background task
             try:
-                await self._process_document(document_id, user_id, file_content, file_type, collection)
+                await self._process_document(
+                    document_id, user_id, file_content, file_type, collection, supplemental_info
+                )
             except Exception as e:
                 logger.error(f"Document processing failed: {e}")
                 # FR-009: Map to user-friendly error with suggestion
@@ -212,7 +244,8 @@ class DocumentService:
             raise AutoBidderError(f"Failed to upload document: {e}")
 
     async def _process_document(
-        self, document_id: str, user_id: str, file_content: bytes, file_type: str, collection: str
+        self, document_id: str, user_id: str, file_content: bytes, file_type: str, collection: str,
+        supplemental_info: Optional[str] = None
     ) -> None:
         """
         Process a document: parse, chunk, embed, and store in vector DB.
@@ -223,6 +256,7 @@ class DocumentService:
             file_content: File content as bytes
             file_type: File type (pdf, docx, txt)
             collection: Collection name
+            supplemental_info: Additional context to append for embedding
         """
         try:
             # Update status to processing
@@ -252,6 +286,12 @@ class DocumentService:
 
                 if not chunk_texts:
                     raise AutoBidderError("No text content extracted from document")
+
+                # Append supplemental info to the last chunk for embedding
+                # This ensures it's searchable but not duplicated across all chunks
+                if supplemental_info:
+                    supplemental_section = f"\n\n---SUPPLEMENTAL INFO---\n{supplemental_info}"
+                    chunk_texts[-1] += supplemental_section
 
                 # Generate embeddings using local sentence-transformers model
                 embeddings = self.embedding_model.encode(
@@ -339,31 +379,31 @@ class DocumentService:
                 update_fields = ["processing_status = $2"]
                 params = [document_id, status]
                 param_count = 2
-                
+
                 if error_message:
                     param_count += 1
                     update_fields.append(f"processing_error = ${param_count}")
                     params.append(error_message)
-                
+
                 if chunk_count is not None:
                     param_count += 1
                     update_fields.append(f"chunk_count = ${param_count}")
                     params.append(chunk_count)
-                
+
                 if token_count is not None:
                     param_count += 1
                     update_fields.append(f"token_count = ${param_count}")
                     params.append(token_count)
-                
+
                 if status == "completed":
                     update_fields.append("processed_at = CURRENT_TIMESTAMP")
-                
+
                 query = f"""
                     UPDATE knowledge_base_documents
                     SET {', '.join(update_fields)}, updated_at = CURRENT_TIMESTAMP
                     WHERE id = $1
                 """
-                
+
                 await conn.execute(query, *params)
         except Exception as e:
             logger.error(f"Failed to update document status: {e}")
@@ -393,7 +433,15 @@ class DocumentService:
             except VectorStoreError as e:
                 logger.warning(f"Failed to delete from ChromaDB: {e}")
 
-            # TODO: Delete from file storage if implemented
+            # Delete from file storage
+            if document.file_url:
+                try:
+                    file_path = Path(settings.backend_root) / document.file_url
+                    if file_path.exists():
+                        file_path.unlink()
+                        logger.info(f"Deleted file: {file_path}")
+                except Exception as e:
+                    logger.warning(f"Failed to delete file: {e}")
 
             # Delete from database
             pool = await get_db_pool()
@@ -428,9 +476,30 @@ class DocumentService:
         try:
             document = await self.get_document(document_id, user_id)
 
-            # TODO: Implement file retrieval from storage
-            # For now, this is not supported without file storage
-            raise AutoBidderError("Document reprocessing requires file storage (not yet implemented)")
+            # Read file from storage
+            if not document.file_url:
+                raise AutoBidderError("Document file not found in storage")
+
+            file_path = Path(settings.backend_root) / document.file_url
+            if not file_path.exists():
+                raise AutoBidderError(f"Document file not found at {file_path}")
+
+            file_content = file_path.read_bytes(), None
+
+            # Delete old embeddings from ChromaDB
+            try:
+                await vector_store.delete_document(
+                    collection_name=document.collection,
+                    user_id=str(user_id),
+                    document_id=str(document_id),
+                )
+            except VectorStoreError as e:
+                logger.warning(f"Failed to delete old embeddings: {e}")
+
+            # Reprocess document
+            await self._process_document(
+                document_id, user_id, file_content, document.file_type, document.collection
+            )
 
         except AutoBidderError:
             raise
@@ -474,6 +543,7 @@ class DocumentService:
         return Document(
             id=str(row["id"]),
             user_id=str(row["user_id"]),
+            title=row.get("title"),
             filename=row["filename"],
             file_type=row["file_type"],
             file_size_bytes=row["file_size_bytes"],
@@ -491,6 +561,10 @@ class DocumentService:
             processed_at=row.get("processed_at"),
             created_at=row["created_at"],
             updated_at=row["updated_at"],
+            reference_url=row.get("reference_url"),
+            email=row.get("email"),
+            phone=row.get("phone"),
+            contact_url=row.get("contact_url"),
         )
 
 

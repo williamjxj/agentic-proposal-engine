@@ -78,6 +78,8 @@ class Settings(BaseSettings):
     max_file_size_mb: int = Field(default=50, alias="MAX_FILE_SIZE_MB")
     chunk_size: int = Field(default=1000, alias="CHUNK_SIZE")
     chunk_overlap: int = Field(default=200, alias="CHUNK_OVERLAP")
+    kb_storage_dir: str = Field(default="./data/kb", alias="KB_STORAGE_DIR")
+    backend_root: str = Field(default=".", alias="BACKEND_ROOT")
 
     # ETL / Job Persistence Configuration
     etl_use_persistence: bool = Field(default=False, alias="ETL_USE_PERSISTENCE")
