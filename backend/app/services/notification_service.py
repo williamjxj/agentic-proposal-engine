@@ -125,3 +125,60 @@ async def get_user_email(user_id: str) -> str | None:
             user_id,
         )
     return row["email"] if row and row.get("email") else None
+
+
+async def send_test_proposal_email(
+    target_email: str,
+    proposal: Any,
+) -> bool:
+    """
+    Send a test proposal email to the target address.
+    Used for manual/mock projects testing.
+    """
+    if not settings.sendgrid_api_key:
+        logger.info(
+            "SENDGRID_API_KEY not set; skipping test proposal email for %s",
+            target_email,
+        )
+        # Mock success for dev if no key (or log the content)
+        logger.info(f"TEST PROPOSAL CONTENT for {target_email}:\n{proposal.description}")
+        return True
+
+    try:
+        from sendgrid import SendGridAPIClient
+        from sendgrid.helpers.mail import Mail
+    except ImportError:
+        logger.warning("SendGrid not installed; skipping test proposal email")
+        return False
+
+    subject = f"TEST PROPOSAL: {proposal.title}"
+    body = f"""
+New test proposal submitted via Auto-Bidder.
+
+Project: {proposal.title}
+Platform: {proposal.job_platform}
+Client: {proposal.client_name}
+
+--- PROPOSAL CONTENT ---
+{proposal.description}
+
+--- METADATA ---
+Generated with AI: {proposal.generated_with_ai}
+AI Model: {proposal.ai_model_used}
+    """
+
+    message = Mail(
+        from_email=(DEFAULT_FROM_EMAIL, DEFAULT_FROM_NAME),
+        to_emails=target_email,
+        subject=subject,
+        plain_text_content=body,
+    )
+
+    try:
+        sg = SendGridAPIClient(settings.sendgrid_api_key)
+        sg.send(message)
+        logger.info("Test proposal email sent to %s", target_email)
+        return True
+    except Exception as e:
+        logger.warning("SendGrid failed for test proposal to %s: %s", target_email, e)
+        return False

@@ -23,6 +23,7 @@ class ProjectBase(BaseModel):
     budget_type: str = Field("fixed", description="Budget type: fixed or hourly")
     platform: str = Field("upwork", description="Source platform: upwork, freelancer, hf_dataset, etc.")
     url: Optional[str] = Field(None, description="External URL to job posting")
+    test_email: Optional[str] = Field(None, description="Test email for manual/mock projects")
     status: str = Field("new", description="Status: new, reviewed, applied, rejected")
 
 

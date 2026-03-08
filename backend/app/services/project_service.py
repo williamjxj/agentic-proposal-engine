@@ -47,7 +47,7 @@ async def upsert_projects(records: List[JobRecord], etl_source: str = "hf_loader
         platform = PLATFORM_MAP.get(rec.platform, rec.platform)
         if platform not in (
             "upwork", "freelancer", "linkedin", "toptal", "guru",
-            "remoteok", "remotive", "huggingface_dataset", "other"
+            "remoteok", "remotive", "huggingface_dataset", "other", "manual"
         ):
             platform = "huggingface_dataset"
 
@@ -143,7 +143,7 @@ async def list_projects(
 
     if platform and platform != "all":
         params.append(platform)
-        conditions.append(f"p.platform = ${idx}")
+        conditions.append(f"p.platform::text = ${idx}")
         idx += 1
 
     if category:
@@ -193,7 +193,7 @@ async def list_projects(
     select_cols = (
         "p.id, p.platform, p.external_id, p.fingerprint_hash, p.category, p.title, p.description, "
         "p.skills_required, p.budget_min, p.budget_max, p.budget_currency, "
-        "p.employer_name, p.etl_source, p.posted_at, p.status"
+        "p.employer_name, p.etl_source, p.posted_at, p.status, p.test_email, p.raw_payload"
     )
     if user_id is not None:
         select_cols += ", ups.status AS user_status"
@@ -247,6 +247,19 @@ def _row_to_project_dict(
         status = row["user_status"]
     elif row.get("status"):
         status = row["status"]
+
+    # Extract model_response from raw_payload if available
+    model_response = None
+    raw_payload = row.get("raw_payload")
+    if raw_payload:
+        if isinstance(raw_payload, str):
+            try:
+                raw_payload = json.loads(raw_payload)
+            except (json.JSONDecodeError, TypeError):
+                raw_payload = None
+        if isinstance(raw_payload, dict):
+            model_response = raw_payload.get("model_response")
+
     d: Dict[str, Any] = {
         "id": str(row["id"]),
         "external_id": row.get("external_id"),
@@ -262,6 +275,8 @@ def _row_to_project_dict(
         "status": status,
         "posted_at": row.get("posted_at").isoformat() if row.get("posted_at") else None,
         "source": row.get("etl_source"),
+        "test_email": row.get("test_email"),
+        "model_response": model_response,  # AI-generated analysis from HuggingFace dataset
     }
     if include_qualification and row.get("qualification_score") is not None:
         d["qualification_score"] = float(row["qualification_score"])
@@ -385,7 +400,7 @@ async def get_project_by_id(
                    p.category, p.title, p.description, p.skills_required,
                    p.budget_min, p.budget_max, p.budget_currency,
                    p.employer_name, p.etl_source, p.posted_at, p.status,
-                   ups.status AS user_status
+                   p.test_email, p.raw_payload, ups.status AS user_status
             FROM projects p
             LEFT JOIN user_project_status ups ON ups.project_id = p.id AND ups.user_id = $2::uuid
             WHERE p.id = $1::uuid
@@ -399,7 +414,7 @@ async def get_project_by_id(
             SELECT id, platform, external_id, fingerprint_hash,
                    category, title, description, skills_required,
                    budget_min, budget_max, budget_currency,
-                   employer_name, etl_source, posted_at, status
+                   employer_name, etl_source, posted_at, status, test_email, raw_payload
             FROM projects WHERE id = $1::uuid
             """,
             project_id,
@@ -436,7 +451,7 @@ async def get_projects_by_fingerprints(
                    p.category, p.title, p.description, p.skills_required,
                    p.budget_min, p.budget_max, p.budget_currency,
                    p.employer_name, p.etl_source, p.posted_at, p.status,
-                   ups.status AS user_status
+                   p.test_email, p.raw_payload, ups.status AS user_status
             FROM projects p
             LEFT JOIN user_project_status ups ON ups.project_id = p.id AND ups.user_id = $2::uuid
             WHERE p.fingerprint_hash = ANY($1::text[])
@@ -450,7 +465,7 @@ async def get_projects_by_fingerprints(
             SELECT id, platform, external_id, fingerprint_hash,
                    category, title, description, skills_required,
                    budget_min, budget_max, budget_currency,
-                   employer_name, etl_source, posted_at, status
+                   employer_name, etl_source, posted_at, status, test_email, raw_payload
             FROM projects WHERE fingerprint_hash = ANY($1::text[])
             """,
             fingerprint_hashes,
@@ -552,3 +567,46 @@ async def list_etl_runs(
         }
         for r in rows
     ]
+
+async def create_manual_project(user_id: str, project_data: Any) -> Dict[str, Any]:
+    """
+    Create a project manually (for testing/mock purposes).
+    """
+    import hashlib
+    import uuid
+
+    pool = await get_db_pool()
+    external_id = str(uuid.uuid4())
+    # fingerprint_hash: SHA256(platform+external_id)
+    fingerprint_hash = hashlib.sha256(f"manual{external_id}".encode()).hexdigest()
+
+    platform = "manual"
+    category = "other"  # Default
+
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            INSERT INTO projects (
+                platform, external_id, fingerprint_hash,
+                category, title, description, skills_required,
+                budget_min, budget_max, budget_currency,
+                employer_name, etl_source, posted_at, test_email, raw_payload
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), $13, $14)
+            RETURNING *
+            """,
+            platform,
+            external_id,
+            fingerprint_hash,
+            category,
+            project_data.title,
+            project_data.description,
+            project_data.skills or [],
+            project_data.budget_min,
+            project_data.budget_max,
+            project_data.budget_type,
+            project_data.company,
+            "manual_upload",
+            project_data.test_email,
+            None,
+        )
+        return _row_to_project_dict(row)

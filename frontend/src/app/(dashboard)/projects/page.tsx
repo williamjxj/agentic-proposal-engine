@@ -16,6 +16,7 @@ import {
   useProjectStats,
   useProjectDatasets,
   useDiscoverProjects,
+  useCreateManualProject,
 } from '@/hooks/useProjects'
 import type { ProjectFilters } from '@/lib/api/client'
 import type { Project, ProjectStats, DatasetInfo } from '@/lib/api/client'
@@ -98,7 +99,12 @@ const ProjectsHeader = memo(function ProjectsHeader({
         title="Projects"
         description="Discover freelance opportunities from HuggingFace datasets"
       >
-        <Button onClick={onOpenDiscover}>Discover Jobs</Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => (window as any).openManualUpload()}>
+            Manual Upload
+          </Button>
+          <Button onClick={onOpenDiscover}>Discover Jobs</Button>
+        </div>
       </PageHeader>
 
       {/* Tabs */}
@@ -166,7 +172,7 @@ const ProjectsHeader = memo(function ProjectsHeader({
                   className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-all duration-200 border-primary/10"
                   onClick={() => {
                     onFiltersChange({ ...filters, search: kw })
-                    // Small delay to ensure state update before search if needed, 
+                    // Small delay to ensure state update before search if needed,
                     // though handler will use current closure val normally
                     setTimeout(onSearch, 0)
                   }}
@@ -473,17 +479,14 @@ function ProjectCard({ project, highlight }: { project: Project; highlight: stri
   const handleGenerateProposal = (e: React.MouseEvent) => {
     e.stopPropagation()
     const projectId = project.id || (project as { external_id?: string }).external_id || ''
-    const params = new URLSearchParams({
-      jobId: projectId,
-      jobTitle: project.title,
-      jobCompany: project.company,
-      jobDescription: project.description,
-      jobPlatform: project.platform,
-    })
-    if (project.skills?.length) params.append('jobSkills', project.skills.join(','))
-    if (project.budget)
-      params.append('jobBudget', `$${project.budget.min} - $${project.budget.max}`)
-    router.push(`/proposals/new?${params.toString()}`)
+    if (projectId) {
+      try {
+        sessionStorage.setItem(`proposal_job_${projectId}`, JSON.stringify(project))
+      } catch (_) {
+        // Ignore quota/private mode errors
+      }
+    }
+    router.push(`/proposals/new?jobId=${encodeURIComponent(projectId)}`)
   }
 
   return (
@@ -507,6 +510,11 @@ function ProjectCard({ project, highlight }: { project: Project; highlight: stri
             <p className="text-sm font-medium text-muted-foreground mt-1 flex items-center gap-1.5">
               🏢 <HighlightText text={project.company} highlight={highlight} />
             </p>
+            {project.test_email && (
+              <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mt-0.5 flex items-center gap-1.5">
+                📧 Test Email: <HighlightText text={project.test_email} highlight={highlight} />
+              </p>
+            )}
           </div>
           {project.budget && (
             <div className="text-right shrink-0">
@@ -713,6 +721,142 @@ function DiscoverDialog({
   )
 }
 
+function ManualUploadDialog({
+  isOpen,
+  onClose,
+  onSubmit,
+  isSubmitting,
+}: {
+  isOpen: boolean
+  onClose: () => void
+  onSubmit: (data: any) => void
+  isSubmitting: boolean
+}) {
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    company: '',
+    skills: '',
+    budget_min: '',
+    budget_max: '',
+    budget_type: 'fixed',
+    test_email: '',
+  })
+
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
+      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto my-auto border border-slate-200 dark:border-slate-800 shadow-xl">
+        <div className="flex items-start justify-between mb-4">
+          <h2 className="text-xl font-bold">Manual Project Upload</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1" aria-label="Close">
+            ✕
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <div className="grid gap-2">
+            <label className="text-sm font-medium">Project Title</label>
+            <Input
+              value={formData.title}
+              onChange={e => setFormData({...formData, title: e.target.value})}
+              placeholder="e.g. Senior Python Developer for Agentic AI"
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <label className="text-sm font-medium">Description</label>
+            <textarea
+              className="min-h-[100px] w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-950 focus:ring-2 focus:ring-primary outline-none transition-all"
+              value={formData.description}
+              onChange={e => setFormData({...formData, description: e.target.value})}
+              placeholder="Provide a detailed project description for better AI matching..."
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Company/Client</label>
+              <Input
+                value={formData.company}
+                onChange={e => setFormData({...formData, company: e.target.value})}
+                placeholder="Client Name"
+              />
+            </div>
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Test Email (Optional)</label>
+              <Input
+                value={formData.test_email}
+                onChange={e => setFormData({...formData, test_email: e.target.value})}
+                placeholder="test@example.com"
+                type="email"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-2">
+            <label className="text-sm font-medium">Skills (comma-separated)</label>
+            <Input
+              value={formData.skills}
+              onChange={e => setFormData({...formData, skills: e.target.value})}
+              placeholder="Python, OpenAI, React"
+            />
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Min Budget</label>
+              <Input
+                type="number"
+                value={formData.budget_min}
+                onChange={e => setFormData({...formData, budget_min: e.target.value})}
+                placeholder="50"
+              />
+            </div>
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Max Budget</label>
+              <Input
+                type="number"
+                value={formData.budget_max}
+                onChange={e => setFormData({...formData, budget_max: e.target.value})}
+                placeholder="500"
+              />
+            </div>
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Type</label>
+              <select
+                className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-950 focus:ring-2 focus:ring-primary outline-none transition-all"
+                value={formData.budget_type}
+                onChange={e => setFormData({...formData, budget_type: e.target.value})}
+              >
+                <option value="fixed">Fixed</option>
+                <option value="hourly">Hourly</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-3 mt-8">
+          <Button
+            className="flex-1"
+            onClick={() => onSubmit({
+              ...formData,
+              skills: formData.skills.split(',').map(s => s.trim()).filter(Boolean),
+              budget_min: formData.budget_min ? parseFloat(formData.budget_min) : null,
+              budget_max: formData.budget_max ? parseFloat(formData.budget_max) : null,
+            })}
+            disabled={isSubmitting || !formData.title || !formData.description}
+          >
+            {isSubmitting ? 'Uploading...' : 'Upload Project'}
+          </Button>
+          <Button variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function ProjectsPage() {
   const router = useRouter()
   const reduceMotion = useReduceMotion()
@@ -746,6 +890,7 @@ export default function ProjectsPage() {
   const [selectedDataset, setSelectedDataset] = useState('')
   const [discoveryResult, setDiscoveryResult] = useState<{ count: number; dataset: string; keywords: string[] } | null>(null)
   const [activeTab, setActiveTab] = useState<ProjectsTab>('search')
+  const [showManualUpload, setShowManualUpload] = useState(false)
 
   const apiLimit = 50
   const apiOffset = (currentPage - 1) * apiLimit
@@ -754,6 +899,13 @@ export default function ProjectsPage() {
   const { data: stats } = useProjectStats()
   const { data: datasets = [] } = useProjectDatasets()
   const discoverMutation = useDiscoverProjects()
+  const manualUploadMutation = useCreateManualProject()
+
+  // Expose dialog opener to header
+  useEffect(() => {
+    ;(window as any).openManualUpload = () => setShowManualUpload(true)
+    return () => { delete (window as any).openManualUpload }
+  }, [])
 
   const [discoverOverride, setDiscoverOverride] = useState<Project[] | null>(null)
   const projects = discoverOverride ?? projectsData?.jobs ?? []
@@ -761,6 +913,7 @@ export default function ProjectsPage() {
   const handleSearch = useCallback(() => {
     setDiscoverOverride(null)
     setAppliedFilters(filters)
+    setCurrentPage(1)
   }, [filters])
 
   useEffect(() => {
@@ -809,6 +962,19 @@ export default function ProjectsPage() {
       alert('Failed to discover jobs. Please try again.')
     }
   }, [discoverKeywords, selectedDataset, discoverMutation])
+
+  const handleManualUpload = useCallback(async (data: any) => {
+    try {
+      const result = await manualUploadMutation.mutateAsync(data)
+      if (result) {
+        setShowManualUpload(false)
+        refetch() // Refresh the list
+      }
+    } catch (error) {
+      console.error('Failed to upload project:', error)
+      alert('Failed to upload project. Please try again.')
+    }
+  }, [manualUploadMutation, refetch])
 
   const isInitialLoad = isLoading && projects.length === 0
   const isSearching = isFetching && !isInitialLoad
@@ -882,6 +1048,15 @@ export default function ProjectsPage() {
           setSelectedDataset={setSelectedDataset}
           onDiscover={handleDiscoverJobs}
           onClose={() => setShowDiscoverDialog(false)}
+        />
+      )}
+
+      {showManualUpload && (
+        <ManualUploadDialog
+          isOpen={showManualUpload}
+          isSubmitting={manualUploadMutation.isPending}
+          onSubmit={handleManualUpload}
+          onClose={() => setShowManualUpload(false)}
         />
       )}
     </PageContainer>

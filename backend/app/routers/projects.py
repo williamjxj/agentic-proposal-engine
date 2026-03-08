@@ -27,6 +27,7 @@ from ..models.project import (
     ProjectDiscoverRequest,
     ProjectDiscoverResponse,
     Project,
+    ProjectCreate,
     ProjectFilters,
     ProjectStats,
     ProjectListResponse
@@ -168,6 +169,27 @@ async def discover_projects(
         raise HTTPException(
             status_code=501,
             detail="Real web scraping not implemented yet. Set USE_HF_DATASET=true to use mock data."
+        )
+
+
+@router.post("/manual", response_model=Project)
+async def create_manual_project(
+    project_data: ProjectCreate,
+    current_user: UserResponse = Depends(get_current_user)
+):
+    """
+    Manually create a project for testing.
+    """
+    logger.info(f"User {current_user.id} creating manual project: {project_data.title}")
+    try:
+        from ..services.project_service import create_manual_project
+        project = await create_manual_project(str(current_user.id), project_data)
+        return project
+    except Exception as e:
+        logger.exception("Manual project creation failed: %s", e)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to create manual project: {str(e)}"
         )
 
 

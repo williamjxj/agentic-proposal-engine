@@ -375,4 +375,17 @@ async def submit_from_draft(
         draft_row["id"],
     )
     
+    # If the project has a test_email, send the proposal there (for testing)
+    if proposal.job_id:
+        try:
+            from app.services.project_service import get_project_by_id
+            project = await get_project_by_id(proposal.job_id)
+            if project and project.get("test_email"):
+                from app.services.notification_service import send_test_proposal_email
+                await send_test_proposal_email(project["test_email"], proposal)
+        except Exception as e:
+            # Don't fail the submission if email fails
+            import logging
+            logging.getLogger(__name__).warning(f"Failed to send test proposal email: {e}")
+
     return proposal

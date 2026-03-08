@@ -709,7 +709,9 @@ export interface ProposalGenerateRequest {
   job_id?: string
   job_title: string
   job_description: string
+  job_company?: string
   job_skills?: string[]
+  job_model_response?: string  // Structured job analysis (Core Responsibilities, Required Skills, etc.)
   strategy_id?: string
   extra_context?: string
   custom_instructions?: string
@@ -791,6 +793,8 @@ export interface Project {
   requirements?: string[]
   discovered_at: string
   status?: string
+  test_email?: string
+  model_response?: string  // Structured job analysis (Core Responsibilities, Required Skills, etc.)
 }
 
 export interface ProjectDiscoverResponse {
@@ -884,6 +888,16 @@ export async function chatWithProjects(query: string): Promise<{ response: strin
 export async function getProjectStats(): Promise<ProjectStats | null> {
   const backend = getBackendUrl()
   const { data } = await apiClient.get<ProjectStats>(`${backend}/api/projects/stats`)
+  return data
+}
+
+export async function createManualProject(projectData: any): Promise<Project | null> {
+  const backend = getBackendUrl()
+  const { data, error } = await apiClient.post<Project>(
+    `${backend}/api/projects/manual`,
+    projectData
+  )
+  if (error) throw new Error(error)
   return data
 }
 

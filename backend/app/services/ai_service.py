@@ -20,6 +20,7 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from app.config import settings
 from app.services.vector_store import vector_store
 from app.services.strategy_service import strategy_service
+from app.services.keyword_service import keyword_service
 from app.services.document_service import document_service
 from app.models.ai import ProposalGenerateRequest, GeneratedProposal, RAGContext
 from app.core.errors import AutoBidderError, RateLimitError
@@ -35,7 +36,7 @@ class AIService:
         self._user_locks: Dict[str, asyncio.Lock] = {}  # FR-010: per-user generation lock
         self._locks_lock = asyncio.Lock()
         self.llm_provider = settings.llm_provider.lower()
-        
+
         # Initialize OpenAI if configured
         if self.llm_provider == "openai" and settings.openai_api_key:
             self.chat_model = ChatOpenAI(
@@ -58,17 +59,17 @@ class AIService:
             self.chat_model = None
 
     async def generate_proposal(
-        self, 
-        user_id: UUID, 
+        self,
+        user_id: UUID,
         request: ProposalGenerateRequest
     ) -> GeneratedProposal:
         """
         Generate a fully tailored proposal from job context and RAG.
-        
+
         Args:
             user_id: User's UUID
             request: Job data and optional strategy
-            
+
         Returns:
             GeneratedProposal containing the final output
         """
@@ -101,31 +102,41 @@ class AIService:
         try:
             # 1. Fetch Strategy
             strategy = await self._get_relevant_strategy(user_id, request.strategy_id)
-            
+
             # 2. Retrieve Relevant Context (RAG)
             context_data = await self._retrieve_rag_context(user_id, request)
-            
-            # 3. Construct Prompt
+
+            # 3. Fetch user keywords (skills/areas to emphasize)
+            user_keywords: List[str] = []
+            try:
+                kw_list = await keyword_service.list_keywords(
+                    str(user_id), is_active=True
+                )
+                user_keywords = [k.keyword for k in kw_list] if kw_list else []
+            except Exception as ke:
+                logger.debug("Could not load user keywords: %s", ke)
+
+            # 4. Construct Prompt
             system_prompt = self._build_system_prompt(strategy)
-            user_prompt = self._build_user_prompt(request, context_data)
-            
-            # 4. Call LLM
+            user_prompt = self._build_user_prompt(request, context_data, user_keywords)
+
+            # 5. Call LLM
             logger.info(f"Generating proposal for user {user_id} with strategy {strategy.name}")
-            
+
             # Prepare messages
             messages = [
                 SystemMessage(content=system_prompt),
                 HumanMessage(content=user_prompt)
             ]
-            
+
             # Call completion
             response = await self.chat_model.ainvoke(messages)
             llm_result = response.content
-            
-            # 5. Extract Details (Title, Description, etc.)
+
+            # 6. Extract Details (Title, Description, etc.)
             # For now, we simple-parse or use the whole text as description
             # In a more advanced version, we'd use Structured Output (Langchain tools)
-            
+
             # Citation check (research.md §2): if RAG chunks provided but no overlap, append hint
             if context_data.relevant_chunks:
                 chunk_words = set(
@@ -145,7 +156,7 @@ class AIService:
             # Simple parsing of title if AI followed a format like "Title: ... \n\n Content: ..."
             title = f"AI Proposal for: {request.job_title}"
             content = llm_result.strip()
-            
+
             if "Title:" in llm_result[:50]:
                 parts = llm_result.split("\n\n", 1)
                 title_part = parts[0].replace("Title:", "").strip()
@@ -187,19 +198,19 @@ class AIService:
             strategy = await strategy_service.get_strategy(strategy_id, str(user_id))
             if strategy:
                 return strategy
-        
+
         # Fallback to default
         logger.debug(f"Fetching default strategy for user {user_id}")
         strategies = await strategy_service.list_strategies(str(user_id))
-        
+
         # Find default or first available
         for s in strategies:
             if s.is_default:
                 return s
-        
+
         if strategies:
             return strategies[0]
-            
+
         # Hard fallback if no strategies exist
         raise AutoBidderError("No bidding strategies found for user. Please create a strategy first.")
 
@@ -207,18 +218,18 @@ class AIService:
         """Perform similarity search to find relevant knowledge chunks."""
         # Query ChromaDB with job title and description
         search_query = f"{request.job_title} {request.job_description}"
-        
+
         # We need query embeddings. DocumentService has embedding_model for local MiniLM.
         # AIService can also use it.
         query_embedding = document_service.embedding_model.encode(
-            [search_query], 
+            [search_query],
             convert_to_numpy=True
         )[0].tolist()
-        
+
         # Search multiple collections (portfolio + other→general_kb per research.md)
         collections = ["case_studies", "team_profiles", "portfolio", "general_kb"]
         all_relevant_chunks = []
-        
+
         for coll in collections:
             try:
                 results = await vector_store.similarity_search(
@@ -230,7 +241,7 @@ class AIService:
                 all_relevant_chunks.extend(results)
             except Exception as e:
                 logger.debug(f"Search in collection {coll} failed or empty: {e}")
-                
+
         return RAGContext(
             query=search_query,
             relevant_chunks=all_relevant_chunks,
@@ -240,7 +251,7 @@ class AIService:
     def _build_system_prompt(self, strategy: Any) -> str:
         """Construct the system prompt incorporating strategy settings (FR-001, FR-003)."""
         base_instructions = str(strategy.system_prompt)
-        
+
         # FR-001, FR-003: Explicitly require citing portfolio and addressing job skills
         citation_instr = (
             "\nYou MUST cite or reference the relevant experience from the portfolio "
@@ -252,32 +263,49 @@ class AIService:
         )
         tone_instr = f"\nTone: {strategy.tone}"
         focus_instr = f"\nFocus Areas: {', '.join(strategy.focus_areas)}" if strategy.focus_areas else ""
-        
+
         return f"{base_instructions}{citation_instr}{skills_instr}{tone_instr}{focus_instr}\n\n" \
                f"Response Format: Start with 'Title: [Brief Compelling Title]' followed by the full proposal content."
 
-    def _build_user_prompt(self, request: ProposalGenerateRequest, context: RAGContext) -> str:
-        """Construct the user prompt combining job context and RAG data."""
-        
+    def _build_user_prompt(
+        self,
+        request: ProposalGenerateRequest,
+        context: RAGContext,
+        user_keywords: Optional[List[str]] = None,
+    ) -> str:
+        """Construct the user prompt combining job context, RAG data, and user keywords."""
+
         # Format Job Info
-        job_info = f"TARGET JOB:\nTitle: {request.job_title}\nDescription: {request.job_description}\n"
+        job_info = f"TARGET JOB:\nTitle: {request.job_title}\n"
+        if request.job_company:
+            job_info += f"Company: {request.job_company}\n"
+        job_info += f"Description: {request.job_description}\n"
         if request.job_skills:
             job_info += f"Skills Needed: {', '.join(request.job_skills)}\n"
-            
-        # Format RAG context
+
+        # Structured job analysis from dataset (Core Responsibilities, Required Skills, etc.)
+        # Use this to ensure the proposal explicitly addresses each key requirement
+        if request.job_model_response:
+            job_info += f"\nSTRUCTURED JOB ANALYSIS (address each section in your proposal):\n{request.job_model_response}\n"
+
+        # User's keywords/skills to emphasize (from their profile)
+        if user_keywords:
+            job_info += f"\nMY KEY SKILLS/AREAS (emphasize these when relevant): {', '.join(user_keywords)}\n"
+
+        # Format RAG context (portfolio, case studies, etc.)
         context_str = ""
         if context.relevant_chunks:
             context_str = "\nRELEVANT EXPERIENCE FROM MY PORTFOLIO:\n"
             for chunk in context.relevant_chunks:
                 context_str += f"- {chunk.get('document', '')}\n"
-        
+
         # Additional context or instructions
         extra = ""
         if request.extra_context:
             extra += f"\nADDITIONAL INFO: {request.extra_context}\n"
         if request.custom_instructions:
             extra += f"\nCUSTOM INSTRUCTIONS: {request.custom_instructions}\n"
-            
+
         return f"{job_info}{context_str}{extra}\n\nPlease write a tailored, professional, and winning proposal for this job."
 
 
@@ -293,7 +321,7 @@ async def generate_text(prompt: str) -> str:
     if not ai_service.chat_model:
         logger.warning("generate_text called but AI chat_model is not configured")
         return "LLM provider not configured. Please check your .env settings."
-    
+
     try:
         response = await ai_service.chat_model.ainvoke([HumanMessage(content=prompt)])
         return response.content

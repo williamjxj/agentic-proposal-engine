@@ -1,6 +1,6 @@
 /**
  * New Proposal Page
- * 
+ *
  * Create new proposals with auto-save and draft recovery.
  * Demonstrates full auto-save workflow implementation.
  * Supports pre-filling from job discovery results.
@@ -25,7 +25,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { Loader2 } from 'lucide-react'
-import { generateProposalFromJob, listStrategies } from '@/lib/api/client'
+import { generateProposalFromJob, getProject, listStrategies } from '@/lib/api/client'
 import { useToast } from '@/lib/toast/toast-context'
 
 interface ProposalFormData {
@@ -44,6 +44,7 @@ interface JobContext {
   platform: string
   skills?: string
   budget?: string
+  model_response?: string  // Structured job analysis (Core Responsibilities, Required Skills, etc.)
 }
 
 function NewProposalPageContent() {
@@ -67,37 +68,64 @@ function NewProposalPageContent() {
   const [strategies, setStrategies] = useState<{ id: string; name: string; is_default?: boolean }[]>([])
   const [selectedStrategyId, setSelectedStrategyId] = useState<string | null>(null)
 
-  // Extract job data from query parameters
+  // Load job context from sessionStorage (cache) or API by jobId – avoids passing model_response in URL
   useEffect(() => {
     const jobId = searchParams.get('jobId')
-    const jobTitle = searchParams.get('jobTitle')
-    const jobCompany = searchParams.get('jobCompany')
-    const jobDescription = searchParams.get('jobDescription')
-    const jobPlatform = searchParams.get('jobPlatform')
-    const jobSkills = searchParams.get('jobSkills')
-    const jobBudget = searchParams.get('jobBudget')
+    if (!jobId) return
 
-    if (jobId && jobTitle) {
-      // Set job context for reference
+    const applyProject = (p: {
+      id: string
+      title: string
+      company?: string
+      description?: string
+      platform?: string
+      skills?: string[]
+      budget?: { min?: number; max?: number }
+      model_response?: string
+    }) => {
+      const skillsStr = Array.isArray(p.skills) ? p.skills.join(', ') : ''
+      const budgetStr =
+        p.budget?.min != null && p.budget?.max != null
+          ? `$${p.budget.min} - $${p.budget.max}`
+          : undefined
+
       setJobContext({
-        id: jobId,
-        title: jobTitle,
-        company: jobCompany || 'Unknown Company',
-        description: jobDescription || '',
-        platform: jobPlatform || 'Unknown',
-        skills: jobSkills || undefined,
-        budget: jobBudget || undefined,
+        id: p.id,
+        title: p.title,
+        company: p.company || 'Unknown Company',
+        description: p.description || '',
+        platform: p.platform || 'Unknown',
+        skills: skillsStr || undefined,
+        budget: budgetStr,
+        model_response: p.model_response,
       })
-
-      // Pre-fill form with job data
       setFormData((prev) => ({
         ...prev,
-        title: `Proposal for: ${jobTitle}`,
-        budget: jobBudget || prev.budget,
-        skills: jobSkills || prev.skills,
-        description: prev.description || `I am interested in your project "${jobTitle}". `,
+        title: `Proposal for: ${p.title}`,
+        budget: budgetStr || prev.budget,
+        skills: skillsStr || prev.skills,
+        description: prev.description || `I am interested in your project "${p.title}". `,
       }))
     }
+
+    // 1. Try sessionStorage first (same-tab navigation from projects)
+    try {
+      const cached = sessionStorage.getItem(`proposal_job_${jobId}`)
+      if (cached) {
+        const project = JSON.parse(cached) as Parameters<typeof applyProject>[0]
+        if (project?.id && project?.title) {
+          applyProject(project)
+          return
+        }
+      }
+    } catch (_) {
+      // Ignore parse errors
+    }
+
+    // 2. Fallback: fetch from API (new tab, bookmark, refresh)
+    getProject(jobId).then((project) => {
+      if (project) applyProject(project)
+    })
   }, [searchParams])
 
   // Draft recovery
@@ -131,6 +159,7 @@ function NewProposalPageContent() {
             platform: draftData.jobPlatform || 'Unknown',
             skills: draftData.jobSkills,
             budget: draftData.jobBudget,
+            model_response: draftData.jobModelResponse,
           })
         }
       }
@@ -167,6 +196,7 @@ function NewProposalPageContent() {
       jobPlatform: jobContext?.platform,
       jobSkills: jobContext?.skills,
       jobBudget: jobContext?.budget,
+      jobModelResponse: jobContext?.model_response,
       strategy_id: selectedStrategyId,
     },
     enabled: isInitialized && !showRecoveryPrompt,
@@ -262,7 +292,9 @@ function NewProposalPageContent() {
         job_id: jobContext.id,
         job_title: jobContext.title,
         job_description: jobContext.description,
+        job_company: jobContext.company,
         job_skills: jobContext.skills ? jobContext.skills.split(',').map((s) => s.trim()) : undefined,
+        job_model_response: jobContext.model_response,
         strategy_id: selectedStrategyId || undefined,
       })
 

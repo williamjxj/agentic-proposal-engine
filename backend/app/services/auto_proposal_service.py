@@ -72,7 +72,9 @@ async def auto_generate_proposals(
                 job_id=job.get("id"),
                 job_title=job.get("title") or "Untitled",
                 job_description=job.get("description") or "",
+                job_company=job.get("company"),
                 job_skills=job.get("skills") or [],
+                job_model_response=job.get("model_response"),
                 strategy_id=strategy_id,
             )
             result = await ai_service.generate_proposal(user_uuid, request)

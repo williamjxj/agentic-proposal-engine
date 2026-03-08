@@ -12,13 +12,14 @@ import {
   getProjectStats,
   getAvailableDatasets,
   discoverProjects,
+  createManualProject,
 } from '@/lib/api/client'
 import type { ProjectFilters } from '@/lib/api/client'
 
 export const projectKeys = {
   all: ['projects'] as const,
   lists: () => [...projectKeys.all, 'list'] as const,
-  list: (filters?: ProjectFilters) => [...projectKeys.lists(), filters] as const,
+  list: (filters?: ProjectFilters, limit?: number, offset?: number) => [...projectKeys.lists(), filters, limit, offset] as const,
   stats: () => [...projectKeys.all, 'stats'] as const,
   datasets: () => [...projectKeys.all, 'datasets'] as const,
 }
@@ -33,7 +34,7 @@ export function useProjects(
   options?: { enabled?: boolean }
 ) {
   return useQuery({
-    queryKey: projectKeys.list(filters),
+    queryKey: projectKeys.list(filters, limit, offset),
     queryFn: () => listProjects(filters, limit, offset),
     staleTime: 2 * 60 * 1000, // 2 minutes
     gcTime: 5 * 60 * 1000, // 5 minutes (formerly cacheTime)
@@ -83,6 +84,20 @@ export function useDiscoverProjects() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: projectKeys.lists() })
+    },
+  })
+}
+
+/**
+ * Create manual project mutation
+ */
+export function useCreateManualProject() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (projectData: any) => createManualProject(projectData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: projectKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: projectKeys.stats() })
     },
   })
 }

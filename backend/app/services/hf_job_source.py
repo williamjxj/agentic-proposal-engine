@@ -22,17 +22,17 @@ logger = logging.getLogger(__name__)
 def normalize_hf_job(record: dict, source_dataset: str) -> dict:
     """
     Map a raw HF dataset row → internal Job dict.
-    
+
     Handles multiple dataset formats and normalizes to standard schema.
-    
+
     Args:
         record: Raw dataset record
         source_dataset: HuggingFace dataset ID for format-specific handling
-    
+
     Returns:
         Normalized job dictionary matching internal schema
     """
-    
+
     # jacob-hugging-face/job-descriptions format
     # Schema: company_name, job_description, position_title, description_length, model_response
     if source_dataset == "jacob-hugging-face/job-descriptions":
@@ -49,6 +49,7 @@ def normalize_hf_job(record: dict, source_dataset: str) -> dict:
             "company": record.get("company_name", "Unknown Company"),
             "description": record.get("job_description", ""),
             "requirements": record.get("job_requirements", ""),
+            "model_response": record.get("model_response", ""),  # AI-generated analysis for proposals
             "skills": _extract_skills_from_text(record.get("job_requirements", ""))
                 or _extract_skills_from_text(record.get("job_description", "")[:500]),
             "budget_min": None,
@@ -60,7 +61,7 @@ def normalize_hf_job(record: dict, source_dataset: str) -> dict:
             "status": "new",
             "client_rating": round(random.uniform(4.0, 5.0), 1)
         }
-    
+
     # lukebarousse/data_jobs format
     elif source_dataset == "lukebarousse/data_jobs":
         skills = record.get("job_skills", [])
@@ -90,7 +91,7 @@ def normalize_hf_job(record: dict, source_dataset: str) -> dict:
             "status": "new",
             "client_rating": round(random.uniform(4.0, 5.0), 1)
         }
-    
+
     # debasmitamukherjee/IT_job_postings format
     elif "IT_job_postings" in source_dataset or "it_job" in source_dataset.lower():
         return {
@@ -117,7 +118,7 @@ def normalize_hf_job(record: dict, source_dataset: str) -> dict:
             "status": "new",
             "client_rating": round(random.uniform(4.0, 5.0), 1)
         }
-    
+
     # Generic fallback: pass through with sensible defaults
     # Try common column names across HF job datasets
     title = (
@@ -172,13 +173,13 @@ _COMMON_TECH_TERMS = [
 def _extract_skills_from_text(text: str) -> List[str]:
     """
     Extract skills from text field.
-    
+
     Handles comma-separated, pipe-separated, and other formats.
     Falls back to common tech term detection for long unstructured text.
     """
     if not text or not isinstance(text, str):
         return []
-    
+
     # Try common separators
     for sep in [",", "|", ";", "/"]:
         if sep in text:
@@ -186,11 +187,11 @@ def _extract_skills_from_text(text: str) -> List[str]:
             result = [s for s in skills if s and len(s) < 50]
             if result:
                 return result
-    
+
     # If no separator, return as single skill if reasonable length
     if len(text) < 50:
         return [text.strip()] if text.strip() else []
-    
+
     # Fallback: extract known tech terms from long text (e.g. job descriptions)
     text_lower = text.lower()
     found = [term for term in _COMMON_TECH_TERMS if term in text_lower]
@@ -212,23 +213,23 @@ def fetch_hf_jobs(
 ) -> List[dict]:
     """
     Load jobs from a HuggingFace dataset and return normalized records.
-    
+
     This function uses streaming mode to avoid downloading the entire dataset,
     making it efficient for large datasets.
-    
+
     Args:
         dataset_id: HF dataset repo ID (e.g., "jacob-hugging-face/job-descriptions")
         split: Dataset split to use ('train', 'test', etc.)
         limit: Max jobs to return
         keyword_filter: Optional list of keywords to filter titles/descriptions
-    
+
     Returns:
         List of normalized job dictionaries
-    
+
     Examples:
         >>> # Load 10 jobs from default dataset
         >>> jobs = fetch_hf_jobs(limit=10)
-        
+
         >>> # Search for Python jobs
         >>> python_jobs = fetch_hf_jobs(
         ...     dataset_id="jacob-hugging-face/job-descriptions",
@@ -237,7 +238,7 @@ def fetch_hf_jobs(
         ... )
     """
     logger.info(f"Loading HF dataset: {dataset_id} (split={split}, limit={limit})")
-    
+
     try:
         # Use streaming=True to avoid downloading entire dataset
         ds = load_dataset(dataset_id, split=split, streaming=True)
@@ -249,27 +250,27 @@ def fetch_hf_jobs(
         except Exception as e2:
             logger.error(f"Failed to load dataset even without streaming: {e2}")
             return []
-    
+
     jobs = []
     processed = 0
-    
+
     for record in ds:
         if len(jobs) >= limit:
             break
-        
+
         processed += 1
-        
+
         # Convert to dict if needed
         if not isinstance(record, dict):
             record = dict(record)
-        
+
         # Normalize the job
         try:
             normalized = normalize_hf_job(record, dataset_id)
         except Exception as e:
             logger.warning(f"Failed to normalize record: {e}")
             continue
-        
+
         # Optional keyword filter (search in title, description, requirements, skills)
         if keyword_filter:
             skills_str = " ".join(normalized.get("skills") or [])
@@ -279,9 +280,9 @@ def fetch_hf_jobs(
             ).lower()
             if not any(kw.lower() in text for kw in keyword_filter):
                 continue
-        
+
         jobs.append(normalized)
-    
+
     logger.info(f"Returned {len(jobs)} jobs from HF dataset (processed {processed} records)")
     return jobs
 
@@ -289,7 +290,7 @@ def fetch_hf_jobs(
 def get_available_datasets() -> List[Dict[str, Any]]:
     """
     Get list of recommended HuggingFace datasets for job data.
-    
+
     Returns:
         List of dataset info dictionaries
     """
@@ -328,12 +329,12 @@ def search_hf_jobs(
 ) -> List[dict]:
     """
     Convenience function to search jobs by keywords.
-    
+
     Args:
         keywords: List of search terms
         dataset_id: HuggingFace dataset ID
         limit: Max results
-    
+
     Returns:
         List of matching job dictionaries
     """
@@ -353,16 +354,16 @@ async def scrape_jobs_from_hf(
 ) -> List[dict]:
     """
     Async-compatible function matching scraper interface.
-    
+
     This allows HuggingFace dataset loading to be a drop-in replacement
     for async web scraping functions.
-    
+
     Args:
         platform: Platform name (ignored for HF datasets)
         search_terms: Keywords to filter jobs
         max_results: Max jobs to return
         dataset_id: HuggingFace dataset ID
-    
+
     Returns:
         List of job dictionaries
     """
