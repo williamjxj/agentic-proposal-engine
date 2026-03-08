@@ -127,3 +127,4 @@ chromadb/
 
 # Logs
 *.log
+uv.lock

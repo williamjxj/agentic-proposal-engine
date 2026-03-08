@@ -83,7 +83,7 @@ export function AppSidebar() {
             priority
           />
         </Link>
-        
+
         {/* Online/offline indicator */}
         <div className="flex items-center gap-1" title={isOnline ? 'Online' : 'Offline'}>
           {isOnline ? (
@@ -98,15 +98,33 @@ export function AppSidebar() {
         {navLinks}
       </nav>
 
-      <div className="border-t p-4">
+      <div className="border-t p-4 space-y-2">
         <p className="text-xs text-muted-foreground">
-          v0.1.0 - Beta
+          v0.1.9 - Beta
           {!isOnline && (
             <span className="ml-2 text-xs text-red-600 dark:text-red-400">
               (Offline)
             </span>
           )}
         </p>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span>© 2025-2026</span>
+          <a
+            href="https://www.bestitconsulting.ca"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 hover:opacity-80 transition-opacity"
+          >
+            <span>Powered by</span>
+            <Image
+              src="/b11-logo.png"
+              alt="Best IT Consulting"
+              width={60}
+              height={16}
+              className="h-4 w-auto"
+            />
+          </a>
+        </div>
       </div>
     </aside>
 
@@ -129,8 +147,26 @@ export function AppSidebar() {
           <nav className="flex-1 space-y-1 p-4">
             {navLinks}
           </nav>
-          <div className="border-t p-4">
-            <p className="text-xs text-muted-foreground">v0.1.0 - Beta</p>
+          <div className="border-t p-4 space-y-2">
+            <p className="text-xs text-muted-foreground">v0.1.9 - Beta</p>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>© 2025-2026</span>
+              <a
+                href="https://www.bestitconsulting.ca"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 hover:opacity-80 transition-opacity"
+              >
+                <span>Powered by</span>
+                <Image
+                  src="/b11-logo.png"
+                  alt="Best IT Consulting"
+                  width={60}
+                  height={16}
+                  className="h-4 w-auto"
+                />
+              </a>
+            </div>
           </div>
         </div>
       </SheetContent>

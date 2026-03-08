@@ -31,7 +31,7 @@ import { EmptyState } from '@/components/shared/empty-state'
 import { useReduceMotion } from '@/hooks/useReduceMotion'
 import { cn } from '@/lib/utils'
 
-type ProjectsTab = 'search' | 'chat' | 'discover'
+type ProjectsTab = 'search' | 'discover'
 
 interface PageProjectFilters {
   search: string
@@ -111,7 +111,6 @@ const ProjectsHeader = memo(function ProjectsHeader({
       <div className="flex border-b border-slate-200 dark:border-slate-700 mb-4">
         {[
           { id: 'search', label: 'Search Projects' },
-          { id: 'chat', label: 'AI Chat' },
           { id: 'discover', label: 'External Discovery' }
         ].map((tab) => (
           <button
@@ -136,10 +135,6 @@ const ProjectsHeader = memo(function ProjectsHeader({
         {activeTab === 'discover' ? (
           <p className="text-sm text-muted-foreground py-2">
             Click <strong>Discover Jobs</strong> above to fetch new jobs from HuggingFace with custom keywords.
-          </p>
-        ) : activeTab === 'chat' ? (
-          <p className="text-sm text-muted-foreground py-2">
-            Ask our AI about projects, skills in demand, or help matching your profile.
           </p>
         ) : (
           <div className="flex flex-col gap-3">
@@ -567,84 +562,6 @@ function ProjectCard({ project, highlight }: { project: Project; highlight: stri
   )
 }
 
-function ChatSection() {
-  const [messages, setMessages] = useState<{ role: 'user' | 'ai'; content: string }[]>([
-    { role: 'ai', content: 'Hello! I can help you search projects, analyze your skills, or suggest matches. What would you like to know?' }
-  ])
-  const [input, setInput] = useState('')
-  const [isTyping, setIsTyping] = useState(false)
-  const scrollRef = useRef<HTMLDivElement>(null)
-
-  const handleSend = async () => {
-    if (!input.trim() || isTyping) return
-
-    const userMsg = input
-    setInput('')
-    setMessages(prev => [...prev, { role: 'user', content: userMsg }])
-    setIsTyping(true)
-
-    try {
-      const { chatWithProjects } = await import('@/lib/api/client')
-      const result = await chatWithProjects(userMsg)
-
-      setMessages(prev => [...prev, { role: 'ai', content: result?.response || "I'm sorry, I couldn't process that." }])
-    } catch (error) {
-      setMessages(prev => [...prev, { role: 'ai', content: "Error connecting to AI service." }])
-    } finally {
-      setIsTyping(false)
-    }
-  }
-
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-    }
-  }, [messages])
-
-  return (
-    <Card className="flex flex-col h-[600px] shadow-lg border-primary/20 bg-white dark:bg-slate-900">
-      <CardHeader className="border-b bg-slate-50/50 dark:bg-slate-800/50">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">🤖</span>
-          <div>
-            <h3 className="font-bold text-lg">Project Assistant</h3>
-            <p className="text-xs text-muted-foreground">Ask anything about the current job market</p>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((m, i) => (
-          <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm shadow-sm ${m.role === 'user'
-              ? 'bg-primary text-primary-foreground rounded-tr-none'
-              : 'bg-slate-100 dark:bg-slate-800 text-foreground rounded-tl-none border border-slate-200 dark:border-slate-700'
-              }`}>
-              {m.content}
-            </div>
-          </div>
-        ))}
-        {isTyping && (
-          <div className="flex justify-start">
-            <div className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl rounded-tl-none px-4 py-3 text-sm animate-pulse">
-              AI is thinking...
-            </div>
-          </div>
-        )}
-      </CardContent>
-      <CardFooter className="border-t p-4 flex gap-2 bg-slate-50/50 dark:bg-slate-800/50">
-        <Input
-          placeholder="Ask about python jobs, market trends..."
-          value={input}
-          className="bg-white dark:bg-slate-900"
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-        />
-        <Button onClick={handleSend} disabled={isTyping} className="shrink-0 shadow-sm">Send</Button>
-      </CardFooter>
-    </Card>
-  )
-}
-
 function DiscoverDialog({
   isDiscovering,
   keywords,
@@ -1018,10 +935,7 @@ export default function ProjectsPage() {
             </div>
           )}
 
-          {activeTab === 'chat' ? (
-            <ChatSection />
-          ) : (
-            <ProjectsResults
+          <ProjectsResults
               projects={projects}
               isLoading={isFetching && projects.length === 0}
               searchHighlight={appliedFilters.search}

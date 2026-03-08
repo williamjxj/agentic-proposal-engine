@@ -10,6 +10,7 @@ import { WorkflowProvider } from '@/lib/workflow/session-context'
 import { BrowserNavigationHandler } from '@/components/workflow/browser-navigation-handler'
 import { ToastProvider } from '@/lib/toast/toast-context'
 import { SidebarProvider } from '@/lib/sidebar/sidebar-context'
+import { AIAssistant } from '@/components/shared/ai-assistant'
 
 export default function DashboardLayout({
   children,
@@ -30,6 +31,8 @@ export default function DashboardLayout({
           </main>
         </div>
       </div>
+      {/* Global AI Assistant */}
+      <AIAssistant />
         </SidebarProvider>
       </ToastProvider>
     </WorkflowProvider>
