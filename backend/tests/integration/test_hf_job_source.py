@@ -20,11 +20,12 @@ from app.services.hf_job_source import (
 @pytest.mark.slow
 def test_hf_basic_loading() -> None:
     """Basic job loading from HuggingFace dataset."""
-    jobs = fetch_hf_jobs(
+    jobs, total_scanned = fetch_hf_jobs(
         dataset_id="jacob-hugging-face/job-descriptions",
         limit=5,
     )
     assert len(jobs) <= 5
+    assert total_scanned >= 0
     if jobs:
         job = jobs[0]
         assert "title" in job
@@ -66,7 +67,7 @@ def test_hf_available_datasets() -> None:
 def test_hf_data_jobs_dataset() -> None:
     """Alternative dataset (lukebarousse/data_jobs) can be loaded."""
     try:
-        jobs = fetch_hf_jobs(
+        jobs, _ = fetch_hf_jobs(
             dataset_id="lukebarousse/data_jobs",
             limit=3,
         )

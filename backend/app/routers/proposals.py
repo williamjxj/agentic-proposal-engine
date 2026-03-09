@@ -22,6 +22,18 @@ from app.models.ai import ProposalGenerateRequest, GeneratedProposal
 router = APIRouter(prefix="/api/proposals", tags=["proposals"])
 
 
+@router.get("/applied-ids")
+async def get_applied_job_ids(
+    current_user: UserResponse = Depends(get_current_user),
+):
+    """
+    Return job identifiers for which the user has a draft or submitted proposal.
+    Used by Projects page to disable repeat 'Generate Proposal' on already-applied jobs.
+    """
+    ids = await proposal_service.get_applied_job_ids(current_user.id)
+    return {"job_ids": ids}
+
+
 @router.get("", response_model=ProposalListResponse)
 async def list_proposals(
     status: Optional[str] = Query(None, description="Filter by status"),

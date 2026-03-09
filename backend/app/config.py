@@ -83,6 +83,11 @@ class Settings(BaseSettings):
 
     # ETL / Job Persistence Configuration
     etl_use_persistence: bool = Field(default=False, alias="ETL_USE_PERSISTENCE")
+    project_filter_keywords: Optional[str] = Field(
+        default=None,
+        alias="PROJECT_FILTER_KEYWORDS",
+        description="Comma-separated default filter keywords when user has none (006)",
+    )
     hf_etl_schedule_hours: int = Field(default=168, alias="HF_ETL_SCHEDULE_HOURS")  # 168 = weekly
     freelancer_etl_schedule_hours: int = Field(default=24, alias="FREELANCER_ETL_SCHEDULE_HOURS")  # 24 = daily
 

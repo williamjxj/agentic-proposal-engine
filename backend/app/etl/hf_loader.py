@@ -4,6 +4,9 @@ HuggingFace ETL Loader
 Loads jobs from HuggingFace datasets, applies domain filter,
 normalizes to JobRecord, and supports run_hf_ingestion for ETL pipeline.
 Per docs/todos/autobidder-etl-rag-schema-spec.md Section 2.2
+
+NOTE (006): Keyword filtering for Projects list is NOT applied during ingestion (FR-004).
+Filtering by user/system keywords happens only in project_service.list_projects at list time.
 """
 
 import hashlib
@@ -55,7 +58,7 @@ def load_and_filter_hf_jobs(
     Returns:
         (filtered_job_records, total_extracted, total_filtered)
     """
-    raw_jobs = fetch_hf_jobs(
+    raw_jobs, _ = fetch_hf_jobs(
         dataset_id=dataset_id,
         limit=limit,
         keyword_filter=keyword_filter,

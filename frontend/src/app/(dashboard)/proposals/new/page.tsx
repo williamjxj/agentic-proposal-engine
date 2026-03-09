@@ -10,6 +10,7 @@
 
 import { Suspense, useState, useEffect, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAutoSave } from '@/hooks/useAutoSave'
 import { useDraftRecovery } from '@/hooks/useDraftRecovery'
 import { AutoSaveIndicator, DraftRecoveryBanner } from '@/components/workflow/auto-save-indicator'
@@ -52,6 +53,7 @@ function NewProposalPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const toast = useToast()
+  const queryClient = useQueryClient()
   const [formData, setFormData] = useState<ProposalFormData>({
     title: '',
     description: '',
@@ -375,6 +377,10 @@ function NewProposalPageContent() {
 
       // Clear draft so it doesn't appear in recovery
       discardDraft('proposal', draftId).catch(() => {})
+
+      // Invalidate applied job ids so Projects page shows "Applied" badge
+      const { projectKeys } = await import('@/hooks/useProjects')
+      queryClient.invalidateQueries({ queryKey: projectKeys.appliedIds() })
 
       toast.success(saveAsDraft ? 'Draft saved successfully!' : 'Proposal submitted successfully!')
       router.push('/proposals')

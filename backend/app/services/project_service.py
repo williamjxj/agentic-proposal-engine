@@ -137,7 +137,11 @@ async def list_projects(
             or_parts = []
             for kw in keywords:
                 params.append(f"%{kw}%")
-                or_parts.append(f"(p.title ILIKE ${idx} OR p.description ILIKE ${idx})")
+                # Match title, description, or any skill (FR-005, FR-006)
+                or_parts.append(
+                    f"(p.title ILIKE ${idx} OR p.description ILIKE ${idx} OR "
+                    f"EXISTS (SELECT 1 FROM unnest(COALESCE(p.skills_required, ARRAY[]::text[])) AS s WHERE s ILIKE ${idx}))"
+                )
                 idx += 1
             conditions.append("(" + " OR ".join(or_parts) + ")")
 
@@ -284,11 +288,32 @@ def _row_to_project_dict(
     return d
 
 
-async def get_stats() -> Dict[str, Any]:
-    """Aggregate stats for projects page."""
+async def get_stats(keyword_filter: Optional[str] = None) -> Dict[str, Any]:
+    """Aggregate stats for projects page. keyword_filter: comma-separated for OR match."""
     pool = await get_db_pool()
 
-    total = await pool.fetchval("SELECT COUNT(*)::int FROM projects")
+    total_data = await pool.fetchval("SELECT COUNT(*)::int FROM projects")
+    total_opportunities = total_data
+
+    if keyword_filter:
+        keywords = [k.strip() for k in keyword_filter.split(",") if k.strip()]
+        if keywords:
+            or_parts = []
+            params: List[Any] = []
+            for i, kw in enumerate(keywords):
+                params.append(f"%{kw}%")
+                or_parts.append(
+                    f"(p.title ILIKE ${i+1} OR p.description ILIKE ${i+1} OR "
+                    f"EXISTS (SELECT 1 FROM unnest(COALESCE(p.skills_required, ARRAY[]::text[])) AS s WHERE s ILIKE ${i+1}))"
+                )
+            where_clause = "(" + " OR ".join(or_parts) + ")"
+            total_opportunities = await pool.fetchval(
+                f"SELECT COUNT(*)::int FROM projects p WHERE {where_clause}",
+                *params,
+            )
+            total_opportunities = total_opportunities or 0
+
+    total = total_opportunities  # Backward compat
     by_platform = await pool.fetch(
         "SELECT platform::text, COUNT(*)::int FROM projects GROUP BY platform"
     )
@@ -326,12 +351,14 @@ async def get_stats() -> Dict[str, Any]:
         top_skill = next(iter(by_skill))
 
     return {
-        "total_jobs": total or 0,
+        "total_data": total_data or 0,
+        "total_opportunities": total_opportunities or 0,
+        "total_jobs": total_opportunities or 0,  # Backward compat
         "by_platform": by_platform_dict,
         "by_skill": dict(list(by_skill.items())[:10]),
         "avg_budget": float(avg_budget) if avg_budget is not None else None,
         "top_in_demand_skill": top_skill.title() if top_skill else None,
-        "data_source": "Database" if total else None,
+        "data_source": "Database" if total_data else None,
     }
 
 

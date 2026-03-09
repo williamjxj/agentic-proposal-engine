@@ -1,0 +1,92 @@
+# API Contract Extension: Projects List - Keyword Filter (006-filter-projects-by-keywords)
+# Extends: specs/003-projects-etl-persistence/contracts/projects-api.yaml
+# Spec: specs/006-filter-projects-by-keywords/spec.md
+
+openapi: 3.0.3
+info:
+  title: Auto-Bidder Projects API - Keyword Filter Extension
+  version: 2.1.0
+  description: |
+    Extension for 006: Keyword-based filtering of projects list.
+    When search is omitted, backend applies user's keywords (or system fallback) as default filter.
+
+paths:
+  /api/projects/list:
+    get:
+      summary: List jobs with keyword filter (FR-001, FR-002, FR-005, FR-006, FR-007, FR-008)
+      operationId: listProjects
+      tags: [projects, keyword-filter]
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: |
+            Comma-separated keywords for OR filter.
+            If provided: used directly (client override).
+            If omitted: backend uses user's active keywords from keywords table, or PROJECT_FILTER_KEYWORDS env, or shows all.
+          example: "python,ts,ai"
+        - name: platform
+          in: query
+          schema:
+            type: string
+            enum: [upwork, freelancer, huggingface_dataset, other]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [new, reviewed, applied, won, lost, archived]
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: applied
+          in: query
+          schema:
+            type: boolean
+        - name: sort_by
+          in: query
+          schema:
+            type: string
+            enum: [date, category, budget]
+            default: date
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Paginated job list, filtered by keywords (OR on title, description, skills)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [jobs, total, page, pages, limit, source]
+                properties:
+                  jobs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Job'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  pages:
+                    type: integer
+                  limit:
+                    type: integer
+                  source:
+                    type: string
+                    example: database
+
+# Keyword filter behavior (semantic, not schema)
+# - Match fields: title, description, skills (skills_required array)
+# - Match type: ILIKE (case-insensitive substring)
+# - Logic: OR - project included if ANY keyword matches ANY field
+# - Empty keywords: ignored; no keywords = show all

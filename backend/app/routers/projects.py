@@ -34,7 +34,7 @@ from ..models.project import (
 )
 from ..services.hf_job_source import fetch_hf_jobs, get_available_datasets
 from ..services.project_service import (
-    list_projects,
+    list_projects as list_projects_svc,
     get_stats,
     get_project_by_id,
     get_projects_by_fingerprints,
@@ -135,12 +135,12 @@ async def discover_projects(
     if USE_HF_DATASET:
         # Fallback: load from HuggingFace without persisting (ETL_USE_PERSISTENCE=false)
         try:
-            jobs = fetch_hf_jobs(
+            jobs, _ = fetch_hf_jobs(
                 dataset_id=HF_DATASET_ID,
                 limit=min(request.max_results, HF_JOB_LIMIT),
                 keyword_filter=keywords
             )
-            
+
             logger.info(f"Loaded {len(jobs)} jobs from HuggingFace dataset")
             
             # Ensure id for frontend (use external_id)
@@ -210,16 +210,34 @@ async def list_projects(
     """
     List all discovered projects for the current user.
     Supports advanced filtering, multi-keyword search, and pagination.
+    When search is omitted, uses user's active keywords or PROJECT_FILTER_KEYWORDS (006).
     """
     logger.info(f"User {current_user.email} listing projects (limit={limit}, offset={offset})")
+
+    # Resolve filter keywords: search param > user keywords > system fallback > None (show all)
+    filter_search = search
+    if not filter_search or not str(filter_search).strip():
+        try:
+            user_kws = await keyword_service.list_keywords(
+                str(current_user.id), search=None, is_active=True
+            )
+            if user_kws:
+                filter_search = ",".join(k.keyword for k in user_kws if k.keyword)
+            elif settings.project_filter_keywords:
+                filter_search = settings.project_filter_keywords
+            else:
+                filter_search = None
+        except Exception as e:
+            logger.debug(f"Could not load user keywords for filter: {e}")
+            filter_search = settings.project_filter_keywords if settings.project_filter_keywords else None
 
     # When ETL persistence is enabled, read from database (FR-001)
     if settings.etl_use_persistence:
         try:
-            jobs, total = await list_projects(
+            jobs, total = await list_projects_svc(
                 limit=limit,
                 offset=offset,
-                search=search,
+                search=filter_search,
                 platform=platform,
                 category=category,
                 status_filter=status,
@@ -242,17 +260,17 @@ async def list_projects(
             logger.error(f"Failed to list jobs from database: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    # Parse multiple keywords if present (HF fallback)
+    # Parse keywords for HF fallback (use resolved filter_search)
     keywords = None
-    if search:
-        keywords = [k.strip() for k in search.split(",") if k.strip()]
+    if filter_search:
+        keywords = [k.strip() for k in str(filter_search).split(",") if k.strip()]
 
     if USE_HF_DATASET:
         try:
             # For HF dataset, we fetch a larger pool and filter/sort locally
             # since the HF streaming API doesn't support complex server-side queries
-            fetch_limit = max(limit * 2, 200) 
-            jobs = fetch_hf_jobs(
+            fetch_limit = max(limit * 2, 200)
+            jobs, _ = fetch_hf_jobs(
                 dataset_id=HF_DATASET_ID,
                 limit=fetch_limit,
                 keyword_filter=keywords
@@ -330,7 +348,7 @@ async def chat_with_projects(
     
     # In HF mode, we'll fetch some sample jobs for context
     if USE_HF_DATASET:
-        jobs = fetch_hf_jobs(dataset_id=HF_DATASET_ID, limit=10)
+        jobs, _ = fetch_hf_jobs(dataset_id=HF_DATASET_ID, limit=10)
         jobs_summary = "\n".join([
             f"- {j.get('title')} ({j.get('platform')}): {j.get('description')[:100]}..."
             for j in jobs
@@ -398,42 +416,70 @@ async def get_project_stats(
     # When ETL persistence is enabled, read from database (FR-001)
     if settings.etl_use_persistence:
         try:
-            return await get_stats()
+            filter_keywords = []
+            try:
+                user_kws = await keyword_service.list_keywords(
+                    str(current_user.id), search=None, is_active=True
+                )
+                if user_kws:
+                    filter_keywords = [k.keyword for k in user_kws if k.keyword]
+                elif settings.project_filter_keywords:
+                    filter_keywords = [
+                        k.strip()
+                        for k in settings.project_filter_keywords.split(",")
+                        if k.strip()
+                    ]
+            except Exception:
+                if settings.project_filter_keywords:
+                    filter_keywords = [
+                        k.strip()
+                        for k in settings.project_filter_keywords.split(",")
+                        if k.strip()
+                    ]
+            stats = await get_stats(
+                keyword_filter=",".join(filter_keywords) if filter_keywords else None
+            )
+            stats["filter_keywords"] = ", ".join(filter_keywords) if filter_keywords else "—"
+            return stats
         except Exception as e:
             logger.error(f"Failed to get stats from database: {e}")
             raise HTTPException(status_code=500, detail=str(e))
     
     if USE_HF_DATASET:
-        # Calculate from HuggingFace dataset
+        # Resolve filter keywords from keywords table first (user → system fallback)
+        filter_keywords: List[str] = []
         try:
-            jobs = fetch_hf_jobs(
-                dataset_id=HF_DATASET_ID,
-                limit=HF_JOB_LIMIT
+            user_kws = await keyword_service.list_keywords(
+                str(current_user.id), search=None, is_active=True
             )
-            
-            # Calculate statistics
-            total_jobs = len(jobs)
+            if user_kws:
+                filter_keywords = [k.keyword for k in user_kws if k.keyword]
+            elif settings.project_filter_keywords:
+                filter_keywords = [
+                    k.strip() for k in settings.project_filter_keywords.split(",") if k.strip()
+                ]
+        except Exception as e:
+            logger.debug(f"Could not load user keywords for stats: {e}")
+            if settings.project_filter_keywords:
+                filter_keywords = [
+                    k.strip() for k in settings.project_filter_keywords.split(",") if k.strip()
+                ]
+
+        try:
+            jobs, total_scanned = fetch_hf_jobs(
+                dataset_id=HF_DATASET_ID,
+                limit=HF_JOB_LIMIT,
+                keyword_filter=filter_keywords if filter_keywords else None,
+            )
+
+            total_data = total_scanned  # Records scraped/looked at
+            total_opportunities = len(jobs)  # Records matching keywords
+
             by_platform = {}
-            by_skill = {}
             budgets = []
-
-            # Skills to deprioritize (ubiquitous, low signal for "in-demand")
-            LOW_SIGNAL_SKILLS = {"git", "html", "css", "rest", "api"}
-
             for job in jobs:
-                # Count by platform
                 platform = job.get("platform", "unknown")
                 by_platform[platform] = by_platform.get(platform, 0) + 1
-
-                # Count by skill
-                skills = job.get("skills", [])
-                if isinstance(skills, list):
-                    for skill in skills[:5]:
-                        if skill:
-                            sk = skill.lower().strip()
-                            by_skill[sk] = by_skill.get(sk, 0) + 1
-
-                # Collect budgets (HF jobs use budget_min/budget_max)
                 min_b = job.get("budget_min")
                 max_b = job.get("budget_max")
                 budget = job.get("budget")
@@ -444,56 +490,42 @@ async def get_project_stats(
                     budgets.append((float(min_b) + float(max_b)) / 2)
                 elif min_b is not None:
                     budgets.append(float(min_b))
-
-            # Average budget
             avg_budget = sum(budgets) / len(budgets) if budgets else None
 
-            # Sort by_skill by count (top 15 for picking best)
-            by_skill_sorted = sorted(
-                by_skill.items(), key=lambda x: x[1], reverse=True
-            )[:15]
-            by_skill = dict(by_skill_sorted[:10])
-
-            # Top in-demand skill: prefer trending/AI skills, deprioritize low-signal
-            top_in_demand = None
-            for sk, cnt in by_skill_sorted:
-                if sk in LOW_SIGNAL_SKILLS and len(by_skill_sorted) > 3:
-                    continue
-                top_in_demand = sk
-                break
-            if not top_in_demand and by_skill_sorted:
-                top_in_demand = by_skill_sorted[0][0]
-
-            # Data source label (HF mode = HuggingFace; avoid confusing "Platforms = 1")
-            data_source = "HuggingFace" if by_platform else None
+            filter_keywords_str = ", ".join(filter_keywords) if filter_keywords else "—"
+            data_source = "HuggingFace"
 
             return {
-                "total_jobs": total_jobs,
+                "total_data": total_data,
+                "total_opportunities": total_opportunities,
+                "total_jobs": total_opportunities,  # Backward compat
                 "by_platform": by_platform,
-                "by_skill": by_skill,
-                "avg_budget": avg_budget,
-                "top_in_demand_skill": top_in_demand.title() if top_in_demand else None,
+                "by_skill": {},
+                "avg_budget": float(avg_budget) if avg_budget is not None else None,
+                "filter_keywords": filter_keywords_str,
                 "data_source": data_source,
             }
         except Exception as e:
             logger.error(f"Error calculating stats: {e}")
-            # Return empty stats on error
             return {
+                "total_data": 0,
+                "total_opportunities": 0,
                 "total_jobs": 0,
                 "by_platform": {},
                 "by_skill": {},
                 "avg_budget": None,
-                "top_in_demand_skill": None,
+                "filter_keywords": "—",
                 "data_source": None,
             }
     else:
-        # TODO: Calculate from database
         return {
+            "total_data": 0,
+            "total_opportunities": 0,
             "total_jobs": 0,
             "by_platform": {},
             "by_skill": {},
             "avg_budget": None,
-            "top_in_demand_skill": None,
+            "filter_keywords": "—",
             "data_source": None,
         }
 

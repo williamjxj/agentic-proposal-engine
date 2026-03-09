@@ -6,6 +6,9 @@ Scrapes Freelancer.com and/or loads from JSON, applies domain filter, and option
 - Loads to PostgreSQL (default when DATABASE_URL is set)
 - Saves to JSON file (--scrape-only or --output)
 
+NOTE (006/FR-004): Keyword filtering for Projects list is NOT applied during ingestion.
+Filtering by user/system keywords happens only in project_service.list_projects at list time.
+
 For cron/Airflow. Run from backend: cd backend && uv run python scripts/freelancer_etl.py
 
 Usage:

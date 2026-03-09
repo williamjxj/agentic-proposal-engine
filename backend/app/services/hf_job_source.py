@@ -224,7 +224,7 @@ def fetch_hf_jobs(
         keyword_filter: Optional list of keywords to filter titles/descriptions
 
     Returns:
-        List of normalized job dictionaries
+        Tuple of (jobs list, total_scanned count). total_scanned = records streamed.
 
     Examples:
         >>> # Load 10 jobs from default dataset
@@ -271,20 +271,24 @@ def fetch_hf_jobs(
             logger.warning(f"Failed to normalize record: {e}")
             continue
 
-        # Optional keyword filter (search in title, description, requirements, skills)
+        # Optional keyword filter (search in title, description, requirements, skills, model_response)
+        # model_response (jacob-hugging-face) often contains AI-generated skills/summary not in raw fields
         if keyword_filter:
             skills_str = " ".join(normalized.get("skills") or [])
+            model_resp = normalized.get("model_response") or ""
             text = (
                 f"{normalized.get('title', '')} {normalized.get('description', '')} "
-                f"{normalized.get('requirements', '')} {skills_str}"
+                f"{normalized.get('requirements', '')} {skills_str} {model_resp}"
             ).lower()
             if not any(kw.lower() in text for kw in keyword_filter):
                 continue
 
         jobs.append(normalized)
 
-    logger.info(f"Returned {len(jobs)} jobs from HF dataset (processed {processed} records)")
-    return jobs
+    logger.info(
+        f"Returned {len(jobs)} jobs from HF dataset (processed {processed} records)"
+    )
+    return jobs, processed
 
 
 def get_available_datasets() -> List[Dict[str, Any]]:
@@ -338,11 +342,12 @@ def search_hf_jobs(
     Returns:
         List of matching job dictionaries
     """
-    return fetch_hf_jobs(
+    jobs, _ = fetch_hf_jobs(
         dataset_id=dataset_id,
         limit=limit,
         keyword_filter=keywords
     )
+    return jobs
 
 
 # Alias for backwards compatibility with scraper interface
@@ -367,8 +372,9 @@ async def scrape_jobs_from_hf(
     Returns:
         List of job dictionaries
     """
-    return fetch_hf_jobs(
+    jobs, _ = fetch_hf_jobs(
         dataset_id=dataset_id,
         limit=max_results,
         keyword_filter=search_terms if search_terms else None
     )
+    return jobs

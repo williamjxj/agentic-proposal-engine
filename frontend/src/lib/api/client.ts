@@ -674,6 +674,18 @@ export async function listProposals(
   return data || { proposals: [], total: 0 }
 }
 
+/**
+ * Get job ids for which the user has a draft or submitted proposal.
+ * Used to prevent repeat applications on the Projects page.
+ */
+export async function getAppliedJobIds(): Promise<string[]> {
+  const backend = getBackendUrl()
+  const { data } = await apiClient.get<{ job_ids: string[] }>(
+    `${backend}/api/proposals/applied-ids`
+  )
+  return data?.job_ids ?? []
+}
+
 export async function getProposal(proposalId: string): Promise<any | null> {
   const backend = getBackendUrl()
   const { data } = await apiClient.get<any>(`${backend}/api/proposals/${proposalId}`)
@@ -838,12 +850,16 @@ export interface ProjectDiscoverResponse {
 }
 
 export interface ProjectStats {
-  total_jobs: number
-  by_platform: Record<string, number>
-  by_skill: Record<string, number>
+  total_jobs?: number
+  /** Records scraped/looked at (before keyword filter) */
+  total_data?: number
+  /** Records matching keyword filter (displayed) */
+  total_opportunities?: number
+  by_platform?: Record<string, number>
+  by_skill?: Record<string, number>
   avg_budget?: number
-  /** Most relevant in-demand skill (prioritizes AI, Python, modern dev) */
-  top_in_demand_skill?: string | null
+  /** Keywords used for filter (from keywords table or PROJECT_FILTER_KEYWORDS) */
+  filter_keywords?: string | null
   /** Primary data source (e.g. HuggingFace) */
   data_source?: string | null
 }

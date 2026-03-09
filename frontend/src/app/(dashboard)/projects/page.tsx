@@ -17,6 +17,7 @@ import {
   useProjectDatasets,
   useDiscoverProjects,
   useCreateManualProject,
+  useAppliedJobIds,
 } from '@/hooks/useProjects'
 import type { ProjectFilters } from '@/lib/api/client'
 import type { Project, ProjectStats, DatasetInfo } from '@/lib/api/client'
@@ -30,8 +31,7 @@ import { Input } from '@/components/ui/input'
 import { EmptyState } from '@/components/shared/empty-state'
 import { useReduceMotion } from '@/hooks/useReduceMotion'
 import { cn } from '@/lib/utils'
-
-type ProjectsTab = 'search' | 'discover'
+import { Search, Sparkles, FilePlus } from 'lucide-react'
 
 interface PageProjectFilters {
   search: string
@@ -73,175 +73,138 @@ const itemVariants = {
   visible: (reduceMotion: boolean) => (reduceMotion ? {} : { opacity: 1, y: 0 }),
 }
 
-/** Memoized header/filters with tabs */
+/** Projects toolbar: search, filters, and add-project actions */
 const ProjectsHeader = memo(function ProjectsHeader({
-  activeTab,
-  onTabChange,
   filters,
   onFiltersChange,
   onSearch,
   onOpenDiscover,
+  onOpenManualUpload,
   isSearching,
 }: {
-  activeTab: ProjectsTab
-  onTabChange: (t: ProjectsTab) => void
   filters: PageProjectFilters
   onFiltersChange: (f: PageProjectFilters) => void
-  onSearch: () => void
+  onSearch: (filterOverride?: PageProjectFilters) => void
   onOpenDiscover: () => void
+  onOpenManualUpload: () => void
   isSearching: boolean
 }) {
   const [showAdvanced, setShowAdvanced] = useState(false)
 
   return (
-    <>
+    <div className="space-y-4">
       <PageHeader
         title="Projects"
-        description="Discover freelance opportunities from HuggingFace datasets"
-      >
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => (window as any).openManualUpload()}>
-            Manual Upload
-          </Button>
-          <Button onClick={onOpenDiscover}>Discover Jobs</Button>
-        </div>
-      </PageHeader>
+        description="Search and discover freelance opportunities from HuggingFace datasets"
+      />
 
-      {/* Tabs */}
-      <div className="flex border-b border-slate-200 dark:border-slate-700 mb-4">
-        {[
-          { id: 'search', label: 'Search Projects' },
-          { id: 'discover', label: 'External Discovery' }
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => onTabChange(tab.id as ProjectsTab)}
-            className={cn(
-              'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
-              activeTab === tab.id
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            )}
-            aria-selected={activeTab === tab.id}
-            role="tab"
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="space-y-4">
-        {activeTab === 'discover' ? (
-          <p className="text-sm text-muted-foreground py-2">
-            Click <strong>Discover Jobs</strong> above to fetch new jobs from HuggingFace with custom keywords.
-          </p>
-        ) : (
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-1">
-                <Input
-                  type="text"
-                  placeholder="Search projects (e.g. python, fastapi)..."
-                  value={filters.search}
-                  onChange={(e) => onFiltersChange({ ...filters, search: e.target.value })}
-                  onKeyDown={(e) => e.key === 'Enter' && onSearch()}
-                />
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setShowAdvanced(!showAdvanced)}>
-                  {showAdvanced ? 'Hide Filters' : 'Advanced Filters'}
-                </Button>
-                <Button onClick={onSearch} disabled={isSearching}>
-                  {isSearching ? 'Searching...' : 'Search'}
-                </Button>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <p className="text-xs text-muted-foreground self-center mr-1 font-medium italic">Popular:</p>
-              {['Python', 'FastAPI', 'React', 'Agentic AI', 'Scraping'].map((kw) => (
-                <Badge
-                  key={kw}
-                  variant="secondary"
-                  className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-all duration-200 border-primary/10"
-                  onClick={() => {
-                    onFiltersChange({ ...filters, search: kw })
-                    // Small delay to ensure state update before search if needed,
-                    // though handler will use current closure val normally
-                    setTimeout(onSearch, 0)
-                  }}
-                >
-                  {kw}
-                </Badge>
-              ))}
-            </div>
-
-            {showAdvanced && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700"
-              >
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold uppercase text-muted-foreground">Category</label>
-                  <select
-                    className="w-full text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded px-2 py-1.5"
-                    value={filters.category || ''}
-                    onChange={(e) => onFiltersChange({ ...filters, category: e.target.value })}
-                  >
-                    <option value="">All Categories</option>
-                    <option value="development">Development</option>
-                    <option value="design">Design</option>
-                    <option value="writing">Writing</option>
-                    <option value="marketing">Marketing</option>
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold uppercase text-muted-foreground">Sort By</label>
-                  <select
-                    className="w-full text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded px-2 py-1.5"
-                    value={filters.sortBy || 'date'}
-                    onChange={(e) => onFiltersChange({ ...filters, sortBy: e.target.value })}
-                  >
-                    <option value="date">Newest First</option>
-                    <option value="category">Category</option>
-                    <option value="budget">Budget (High to Low)</option>
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold uppercase text-muted-foreground">Applied Status</label>
-                  <div className="flex items-center gap-2 pt-1.5">
-                    <input
-                      type="checkbox"
-                      id="applied-filter"
-                      checked={filters.applied || false}
-                      onChange={(e) => onFiltersChange({ ...filters, applied: e.target.checked })}
-                      className="rounded border-slate-300"
-                    />
-                    <label htmlFor="applied-filter" className="text-sm">Only Applied</label>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold uppercase text-muted-foreground">Date Range</label>
-                  <div className="flex gap-2">
-                    <Input
-                      type="date"
-                      className="h-8 text-[10px]"
-                      value={filters.startDate || ''}
-                      onChange={(e) => onFiltersChange({ ...filters, startDate: e.target.value })}
-                    />
-                  </div>
-                </div>
-              </motion.div>
-            )}
+      {/* Unified toolbar: search + filters + add-project actions in one row */}
+      <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/30 p-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative w-48 sm:w-64 shrink-0">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <Input
+              type="text"
+              placeholder="Search keywords..."
+              value={filters.search}
+              onChange={(e) => onFiltersChange({ ...filters, search: e.target.value })}
+              onKeyDown={(e) => e.key === 'Enter' && onSearch()}
+              className="pl-9 h-8 text-sm bg-white dark:bg-slate-900"
+            />
           </div>
+          <button
+            type="button"
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm border border-slate-200 bg-white hover:border-primary/30 dark:border-slate-800 dark:bg-slate-900/50 shrink-0"
+          >
+            {showAdvanced ? 'Hide' : 'Filters'}
+          </button>
+          <button
+            type="button"
+            onClick={() => onSearch()}
+            disabled={isSearching}
+            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium border border-primary/40 bg-primary/5 text-primary hover:bg-primary/10 dark:bg-primary/10 dark:border-primary/30 shrink-0 disabled:opacity-50"
+          >
+            {isSearching ? 'Searching...' : 'Search'}
+          </button>
+          <button
+            type="button"
+            onClick={onOpenDiscover}
+            title="Fetch new jobs from HuggingFace with custom keywords"
+            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm border border-slate-200 bg-white hover:border-primary/30 dark:border-slate-800 dark:bg-slate-900/50 shrink-0"
+          >
+            <Sparkles className="h-4 w-4 shrink-0" />
+            Discover
+          </button>
+          <button
+            type="button"
+            onClick={onOpenManualUpload}
+            title="Create a project by entering details manually"
+            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm border border-slate-200 bg-white hover:border-primary/30 dark:border-slate-800 dark:bg-slate-900/50 shrink-0"
+          >
+            <FilePlus className="h-4 w-4 shrink-0" />
+            Add manually
+          </button>
+        </div>
+
+        {showAdvanced && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4"
+          >
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase text-muted-foreground">Category</label>
+              <select
+                className="w-full text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded px-2 py-1.5"
+                value={filters.category || ''}
+                onChange={(e) => onFiltersChange({ ...filters, category: e.target.value })}
+              >
+                <option value="">All Categories</option>
+                <option value="development">Development</option>
+                <option value="design">Design</option>
+                <option value="writing">Writing</option>
+                <option value="marketing">Marketing</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase text-muted-foreground">Sort By</label>
+              <select
+                className="w-full text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded px-2 py-1.5"
+                value={filters.sortBy || 'date'}
+                onChange={(e) => onFiltersChange({ ...filters, sortBy: e.target.value })}
+              >
+                <option value="date">Newest First</option>
+                <option value="category">Category</option>
+                <option value="budget">Budget (High to Low)</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase text-muted-foreground">Applied Status</label>
+              <div className="flex items-center gap-2 pt-1.5">
+                <input
+                  type="checkbox"
+                  id="applied-filter"
+                  checked={filters.applied || false}
+                  onChange={(e) => onFiltersChange({ ...filters, applied: e.target.checked })}
+                  className="rounded border-slate-300"
+                />
+                <label htmlFor="applied-filter" className="text-sm">Only Applied</label>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase text-muted-foreground">Date Range</label>
+              <Input
+                type="date"
+                className="h-8 text-sm"
+                value={filters.startDate || ''}
+                onChange={(e) => onFiltersChange({ ...filters, startDate: e.target.value })}
+              />
+            </div>
+          </motion.div>
         )}
       </div>
-    </>
+    </div>
   )
 })
 
@@ -253,54 +216,68 @@ const AI_TRENDING_SKILLS = new Set([
 ])
 
 /** Stats section - redesigned for AI/freelance trends 2025 */
-function ProjectsStats({ stats }: { stats: ProjectStats | null }) {
+function ProjectsStats({
+  stats,
+  discoverCount,
+}: {
+  stats: ProjectStats | null
+  discoverCount?: number | null
+}) {
   if (!stats) return null
 
-  const topSkill =
-    stats.top_in_demand_skill ??
-    (stats.by_skill && Object.keys(stats.by_skill).length > 0
-      ? Object.entries(stats.by_skill)
-          .sort((a, b) => b[1] - a[1])[0]?.[0]
-          ?.replace(/^\w/, (c) => c.toUpperCase()) ?? 'N/A'
-      : 'N/A')
-  const isAiSkill = typeof topSkill === 'string'
-    && AI_TRENDING_SKILLS.has(topSkill.toLowerCase())
+  const totalData = stats.total_data ?? stats.total_jobs ?? 0
+  // When showing Discover results, use discover count so stats match displayed projects
+  const totalOpportunities =
+    discoverCount != null ? discoverCount : stats.total_opportunities ?? stats.total_jobs ?? 0
+  const isDiscoverOverride = discoverCount != null
   const dataSource =
     stats.data_source ||
     (stats.by_platform && Object.keys(stats.by_platform).length > 0 ? 'HuggingFace' : null) ||
     '—'
+  const filterKeywords = stats.filter_keywords ?? '—'
   const avgBudget = stats.avg_budget != null && stats.avg_budget > 0
     ? `$${Math.round(stats.avg_budget).toLocaleString()}`
     : null
 
   return (
-    <div
-      className={cn(
-        'grid gap-4',
-        avgBudget ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
-      )}
-    >
+    <div className="flex flex-wrap items-center gap-2">
+      <StatsCard
+        title="Total Data"
+        value={totalData}
+        tip="Records scraped from data source (before keyword filter)"
+        inline
+      />
       <StatsCard
         title="Total Opportunities"
-        value={stats.total_jobs || 0}
-        tip="Projects currently available from your data sources"
+        value={totalOpportunities}
+        tip={
+          isDiscoverOverride
+            ? 'Jobs from Discover (displayed below; may use different keywords)'
+            : 'Records matching your keywords (after filter)'
+        }
+        highlight={totalOpportunities > 0 && totalOpportunities !== totalData}
+        inline
       />
       <StatsCard
         title="Data Source"
         value={dataSource}
         tip="Where job data comes from (HuggingFace datasets, or live platforms when enabled)"
+        gradient
+        inline
       />
       <StatsCard
-        title="Top In-Demand Skill"
-        value={topSkill}
-        tip="Most relevant skill in current listings. Prioritizes AI, Python, and modern dev skills—aligned with 2025 freelance trends."
-        highlight={isAiSkill}
+        title="Filter Keywords"
+        value={filterKeywords}
+        tip="Keywords used for filtering (from /keywords or PROJECT_FILTER_KEYWORDS)"
+        keywords
+        inline
       />
       {avgBudget && (
         <StatsCard
           title="Avg. Budget"
           value={avgBudget}
           tip="Average project budget across listed opportunities"
+          inline
         />
       )}
     </div>
@@ -312,19 +289,72 @@ function StatsCard({
   value,
   tip,
   highlight = false,
+  compact = false,
+  gradient = false,
+  keywords = false,
+  inline = false,
 }: {
   title: string
   value: string | number
   tip?: string
   highlight?: boolean
+  compact?: boolean
+  gradient?: boolean
+  keywords?: boolean
+  inline?: boolean
 }) {
+  const valueClassName = cn(
+    keywords
+      ? 'text-sm font-normal min-w-0 flex-1 break-words bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent'
+      : compact
+        ? 'text-sm font-normal bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent'
+        : cn(
+            'font-bold',
+            inline ? 'text-sm' : 'text-2xl tracking-tight',
+            typeof value === 'number' || gradient
+              ? 'bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent'
+              : highlight
+                ? 'text-primary'
+                : 'text-foreground'
+          )
+  )
+
+  if (inline) {
+    return (
+      <div
+        className={cn(
+          'group relative flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm min-w-0',
+          keywords ? 'flex-1' : 'inline-flex shrink-0',
+          highlight
+            ? 'border border-primary/40 bg-primary/5 dark:bg-primary/10 dark:border-primary/30'
+            : 'border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/50'
+        )}
+      >
+        <span className="text-muted-foreground font-medium shrink-0">{title}:</span>
+        <span className={valueClassName} title={typeof value === 'string' ? value : undefined}>
+          {value}
+        </span>
+        {tip && (
+          <span
+            className="cursor-help text-muted-foreground/40 hover:text-primary ml-0.5 shrink-0"
+            title={tip}
+          >
+            ⓘ
+          </span>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div
       className={cn(
-        'group relative rounded-xl border p-5 shadow-sm transition-all duration-300 hover:shadow-md',
-        highlight
-          ? 'border-primary/40 bg-primary/5 dark:bg-primary/10 dark:border-primary/30'
-          : 'border-slate-200 bg-white hover:border-primary/30 dark:border-slate-800 dark:bg-slate-900/50'
+        'group relative rounded-xl p-5 shadow-sm transition-all duration-300 hover:shadow-md',
+        keywords
+          ? 'border-none bg-white dark:bg-slate-900/50'
+          : highlight
+            ? 'border border-primary/40 bg-primary/5 dark:bg-primary/10 dark:border-primary/30'
+            : 'border border-slate-200 bg-white hover:border-primary/30 dark:border-slate-800 dark:bg-slate-900/50'
       )}
     >
       <div className="flex items-center justify-between mb-2">
@@ -339,18 +369,7 @@ function StatsCard({
           </div>
         )}
       </div>
-      <p
-        className={cn(
-          'text-2xl font-bold tracking-tight',
-          typeof value === 'number'
-            ? 'bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent'
-            : highlight
-              ? 'text-primary'
-              : 'text-foreground'
-        )}
-      >
-        {value}
-      </p>
+      <p className={valueClassName}>{value}</p>
     </div>
   )
 }
@@ -360,6 +379,7 @@ const ProjectsResults = memo(function ProjectsResults({
   projects,
   isLoading,
   searchHighlight,
+  appliedJobIds = [],
   onDiscoverClick,
   reduceMotion,
   pagination,
@@ -368,6 +388,7 @@ const ProjectsResults = memo(function ProjectsResults({
   projects: Project[]
   isLoading: boolean
   searchHighlight: string
+  appliedJobIds?: string[]
   onDiscoverClick: () => void
   reduceMotion: boolean
   pagination?: {
@@ -384,7 +405,7 @@ const ProjectsResults = memo(function ProjectsResults({
     return (
       <EmptyState
         title="No projects found"
-        description="We couldn't find any opportunities matching your criteria. Try widening your search or discover new jobs from HuggingFace."
+        description="No projects match your keywords or search. Try adjusting keywords at /keywords, widening your search, or discovering new jobs from HuggingFace."
         icon={<span className="text-4xl">🔍</span>}
         action={
           <Button size="lg" onClick={onDiscoverClick}>
@@ -409,7 +430,11 @@ const ProjectsResults = memo(function ProjectsResults({
             variants={itemVariants}
             custom={reduceMotion}
           >
-            <ProjectCard project={project} highlight={searchHighlight} />
+            <ProjectCard
+              project={project}
+              highlight={searchHighlight}
+              appliedJobIds={appliedJobIds}
+            />
           </motion.div>
         ))}
       </motion.div>
@@ -467,13 +492,23 @@ function HighlightText({ text, highlight }: { text: string; highlight: string })
   )
 }
 
-function ProjectCard({ project, highlight }: { project: Project; highlight: string }) {
+function ProjectCard({
+  project,
+  highlight,
+  appliedJobIds = [],
+}: {
+  project: Project
+  highlight: string
+  appliedJobIds?: string[]
+}) {
   const router = useRouter()
   const [expanded, setExpanded] = useState(false)
+  const projectId = project.id || (project as { external_id?: string }).external_id || ''
+  const hasApplied = projectId && appliedJobIds.includes(projectId)
 
   const handleGenerateProposal = (e: React.MouseEvent) => {
     e.stopPropagation()
-    const projectId = project.id || (project as { external_id?: string }).external_id || ''
+    if (hasApplied) return
     if (projectId) {
       try {
         sessionStorage.setItem(`proposal_job_${projectId}`, JSON.stringify(project))
@@ -482,6 +517,11 @@ function ProjectCard({ project, highlight }: { project: Project; highlight: stri
       }
     }
     router.push(`/proposals/new?jobId=${encodeURIComponent(projectId)}`)
+  }
+
+  const handleViewProposal = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    router.push('/proposals')
   }
 
   return (
@@ -493,6 +533,11 @@ function ProjectCard({ project, highlight }: { project: Project; highlight: stri
               <h3 className="font-bold text-xl group-hover:text-primary transition-colors">
                 <HighlightText text={project.title} highlight={highlight} />
               </h3>
+              {hasApplied && (
+                <Badge variant="outline" className="shrink-0 border-green-500/50 text-green-700 dark:text-green-400">
+                  Applied
+                </Badge>
+              )}
               <Badge variant="secondary" className="uppercase shrink-0">
                 {project.platform}
               </Badge>
@@ -554,9 +599,15 @@ function ProjectCard({ project, highlight }: { project: Project; highlight: stri
             </span>
           )}
         </div>
-        <Button onClick={handleGenerateProposal}>
-          Generate Proposal
-        </Button>
+        {hasApplied ? (
+          <Button variant="outline" onClick={handleViewProposal} title="You already have a draft or submitted proposal for this job">
+            View Proposal
+          </Button>
+        ) : (
+          <Button onClick={handleGenerateProposal}>
+            Generate Proposal
+          </Button>
+        )}
       </CardFooter>
     </Card>
   )
@@ -806,7 +857,6 @@ export default function ProjectsPage() {
   const [discoverKeywords, setDiscoverKeywords] = useState('')
   const [selectedDataset, setSelectedDataset] = useState('')
   const [discoveryResult, setDiscoveryResult] = useState<{ count: number; dataset: string; keywords: string[] } | null>(null)
-  const [activeTab, setActiveTab] = useState<ProjectsTab>('search')
   const [showManualUpload, setShowManualUpload] = useState(false)
 
   const apiLimit = 50
@@ -815,21 +865,23 @@ export default function ProjectsPage() {
   const { data: projectsData, isLoading, isFetching, refetch } = useProjects(apiFilters, apiLimit, apiOffset)
   const { data: stats } = useProjectStats()
   const { data: datasets = [] } = useProjectDatasets()
+  const { data: appliedJobIds = [] } = useAppliedJobIds()
   const discoverMutation = useDiscoverProjects()
   const manualUploadMutation = useCreateManualProject()
-
-  // Expose dialog opener to header
-  useEffect(() => {
-    ;(window as any).openManualUpload = () => setShowManualUpload(true)
-    return () => { delete (window as any).openManualUpload }
-  }, [])
 
   const [discoverOverride, setDiscoverOverride] = useState<Project[] | null>(null)
   const projects = discoverOverride ?? projectsData?.jobs ?? []
 
-  const handleSearch = useCallback(() => {
+  const handleSearch = useCallback((filterOverride?: PageProjectFilters) => {
     setDiscoverOverride(null)
-    setAppliedFilters(filters)
+    // Only use override when it's a valid filter object (from Popular badge), not a click event
+    const filtersToApply =
+      filterOverride &&
+      typeof filterOverride === 'object' &&
+      'search' in filterOverride
+        ? filterOverride
+        : filters
+    setAppliedFilters(filtersToApply)
     setCurrentPage(1)
   }, [filters])
 
@@ -899,12 +951,11 @@ export default function ProjectsPage() {
   return (
     <PageContainer ref={scrollContainerRef} className="space-y-6">
       <ProjectsHeader
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
         filters={filters}
         onFiltersChange={setFiltersState}
         onSearch={handleSearch}
         onOpenDiscover={() => setShowDiscoverDialog(true)}
+        onOpenManualUpload={() => setShowManualUpload(true)}
         isSearching={isSearching}
       />
 
@@ -919,7 +970,10 @@ export default function ProjectsPage() {
         </div>
       ) : (
         <>
-          <ProjectsStats stats={stats ?? null} />
+          <ProjectsStats
+              stats={stats ?? null}
+              discoverCount={discoverOverride ? discoverOverride.length : null}
+            />
           {discoveryResult && (
             <div className="rounded-lg border border-green-200 bg-green-50 p-4 relative dark:border-green-900 dark:bg-green-950">
               <button
@@ -939,6 +993,7 @@ export default function ProjectsPage() {
               projects={projects}
               isLoading={isFetching && projects.length === 0}
               searchHighlight={appliedFilters.search}
+              appliedJobIds={appliedJobIds}
               onDiscoverClick={() => setShowDiscoverDialog(true)}
               reduceMotion={reduceMotion}
               pagination={projectsData ? {

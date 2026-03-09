@@ -44,6 +44,47 @@ def _row_to_proposal(row: dict) -> Proposal:
     )
 
 
+async def get_applied_job_ids(user_id: UUID) -> List[str]:
+    """
+    Return job identifiers for which the user has a draft or submitted proposal.
+    Used to prevent repeat applications. Includes job_identifier, project_id, and draft_work entity_ids.
+    """
+    db = await get_db_pool()
+    ids: list[str] = []
+
+    # From proposals: job_identifier and project_id for draft/submitted
+    rows = await db.fetch(
+        """
+        SELECT job_identifier, project_id FROM proposals
+        WHERE user_id = $1 AND status IN ('draft', 'submitted')
+        """,
+        user_id,
+    )
+    for row in rows:
+        if row.get("job_identifier"):
+            ids.append(str(row["job_identifier"]))
+        if row.get("project_id"):
+            ids.append(str(row["project_id"]))
+
+    # From draft_work: unsaved proposal drafts (entity_id = jobId when creating from job)
+    try:
+        draft_rows = await db.fetch(
+            """
+            SELECT entity_id FROM draft_work
+            WHERE user_id = $1 AND entity_type = 'proposal' AND entity_id IS NOT NULL
+            """,
+            user_id,
+        )
+        for row in draft_rows:
+            if row.get("entity_id"):
+                ids.append(str(row["entity_id"]))
+    except Exception:
+        # draft_work table might not exist in all setups
+        pass
+
+    return list(dict.fromkeys(ids))  # dedupe, preserve order
+
+
 async def list_proposals(
     user_id: UUID,
     status: Optional[str] = None,
@@ -114,7 +155,9 @@ async def create_proposal(
     # Resolve project_id: only link if job exists in projects (avoids FK violation
     # when job_id comes from Discover results not persisted to DB)
     project_id_val = None
+    job_identifier_val = None
     if proposal_data.job_id:
+        job_identifier_val = str(proposal_data.job_id).strip() or None
         try:
             pid = UUID(proposal_data.job_id)
             exists = await db.fetchval(
@@ -130,10 +173,10 @@ async def create_proposal(
         """
         INSERT INTO proposals (
             user_id, title, description, budget, timeline, skills,
-            project_id, job_url, job_platform, client_name, recipient_email, strategy_id,
+            project_id, job_identifier, job_url, job_platform, client_name, recipient_email, strategy_id,
             generated_with_ai, ai_model_used, status
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
         RETURNING *
         """,
         user_id,
@@ -143,6 +186,7 @@ async def create_proposal(
         proposal_data.timeline,
         proposal_data.skills,
         project_id_val,
+        job_identifier_val,
         proposal_data.job_url,
         proposal_data.job_platform,
         proposal_data.client_name,
@@ -269,9 +313,21 @@ async def update_proposal(
         param_idx += 1
 
     if proposal_data.job_id is not None:
-        update_fields.append(f"project_id = ${param_idx}")
-        params.append(UUID(proposal_data.job_id) if proposal_data.job_id else None)
+        job_identifier_val = str(proposal_data.job_id).strip() or None
+        update_fields.append(f"job_identifier = ${param_idx}")
+        params.append(job_identifier_val)
         param_idx += 1
+        try:
+            pid = UUID(proposal_data.job_id)
+            exists = await db.fetchval("SELECT 1 FROM projects WHERE id = $1", pid)
+            if exists:
+                update_fields.append(f"project_id = ${param_idx}")
+                params.append(pid)
+                param_idx += 1
+            else:
+                update_fields.append("project_id = NULL")
+        except (ValueError, TypeError):
+            update_fields.append("project_id = NULL")
 
     if proposal_data.job_url is not None:
         update_fields.append(f"job_url = ${param_idx}")

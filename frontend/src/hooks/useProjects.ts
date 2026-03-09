@@ -13,6 +13,7 @@ import {
   getAvailableDatasets,
   discoverProjects,
   createManualProject,
+  getAppliedJobIds,
 } from '@/lib/api/client'
 import type { ProjectFilters } from '@/lib/api/client'
 
@@ -22,6 +23,7 @@ export const projectKeys = {
   list: (filters?: ProjectFilters, limit?: number, offset?: number) => [...projectKeys.lists(), filters, limit, offset] as const,
   stats: () => [...projectKeys.all, 'stats'] as const,
   datasets: () => [...projectKeys.all, 'datasets'] as const,
+  appliedIds: () => ['projects', 'applied-ids'] as const,
 }
 
 /**
@@ -51,6 +53,19 @@ export function useProjectStats() {
     queryFn: getProjectStats,
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000,
+  })
+}
+
+/**
+ * Job ids the user has already drafted or submitted proposals for.
+ * Used to disable repeat "Generate Proposal" on Projects page.
+ */
+export function useAppliedJobIds() {
+  return useQuery({
+    queryKey: projectKeys.appliedIds(),
+    queryFn: getAppliedJobIds,
+    staleTime: 60 * 1000, // 1 minute - refetch when returning to projects
+    gcTime: 5 * 60 * 1000,
   })
 }
 
