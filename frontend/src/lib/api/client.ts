@@ -744,6 +744,8 @@ export interface ProposalGenerateRequest {
   job_skills?: string[]
   job_model_response?: string  // Structured job analysis (Core Responsibilities, Required Skills, etc.)
   strategy_id?: string
+  /** Knowledge base collections to use for RAG (case_studies, team_profiles, portfolio, other). Omit = all. */
+  collections?: string[]
   extra_context?: string
   custom_instructions?: string
 }

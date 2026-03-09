@@ -37,7 +37,7 @@ An AI-powered auto-bidding platform that reduces proposal writing time from 30 m
 - **Automated Job Discovery**: Discover jobs from HuggingFace datasets (Projects → Discover Jobs); web scraping planned for production
 - **Smart Knowledge Base**: Upload portfolio documents, case studies, and team profiles for AI context (RAG)
 - **AI Proposal Generation**: Generate personalized proposals using job description, structured job analysis, company context, your keywords, and RAG. One-click AI Generate in under 60 seconds
-- **Proposal Email Delivery**: Submit Proposal saves to DB and sends a formal HTML email to the customer via Resend (configurable recipient)
+- **Proposal Email Delivery**: Submit Proposal saves to DB and sends a formal HTML email from `service@bestitconsulting.ca` (verified domain) to the customer via Resend. Customers can reply directly. **BCC archiving active** - all sent proposals automatically copied to business Gmail. See [docs/email-system.md](./docs/email-system.md)
 - **Bidding Strategies**: Create reusable AI prompt templates for different proposal tones and focus areas
 - **Keyword Management**: Filter jobs and emphasize your skills in AI-generated proposals
 - **Analytics Dashboard**: Track win rates, platform performance, and time savings
@@ -47,7 +47,7 @@ An AI-powered auto-bidding platform that reduces proposal writing time from 30 m
 1. **Discover** jobs from HuggingFace (Projects → Discover) or browse persisted projects
 2. **Generate Proposal** — job context (title, description, company, structured analysis) loads via sessionStorage or API
 3. **AI Generate** — RAG (your portfolio) + job context + your keywords + strategy → tailored proposal draft
-4. **Submit Proposal** — saves to DB, sends formal HTML email to `PROPOSAL_SUBMIT_EMAIL` via Resend
+4. **Submit Proposal** — saves to DB, sends formal HTML email from `service@bestitconsulting.ca` to customer (or fallback email). Customers can reply directly. BCC copies archived automatically. See [docs/email-system.md](./docs/email-system.md)
 
 📄 **[View detailed workflow documentation](./docs/diagrams/workflow-diagram.md)**
 
@@ -79,6 +79,10 @@ This is a **full-stack monorepo** with two main components:
 - **RAG**: LangChain for document processing and similarity search
 - **LLM**: OpenAI GPT-4-turbo / DeepSeek
 - **Email**: Resend for proposal submission and job notifications
+  - Verified domain: `service@bestitconsulting.ca`
+  - Supports customer replies via email hosting
+  - BCC archiving active for all sent proposals
+  - See [docs/email-system.md](./docs/email-system.md)
 - **Job Discovery**: HuggingFace datasets (e.g. `jacob-hugging-face/job-descriptions`); Playwright planned for production scraping
 
 ## 🚀 Quick Start
@@ -130,7 +134,8 @@ uv run uvicorn app.main:app --reload --port 8000
 - `DEEPSEEK_API_KEY` or `OPENAI_API_KEY`: LLM provider API key
 - `CHROMA_PERSIST_DIR`: ChromaDB storage path (default: ./chroma_db). Use local mode; Docker ChromaDB requires client upgrade
 - `RESEND_API_KEY`: Resend.com API key for sending proposal emails
-- `PROPOSAL_SUBMIT_EMAIL`: Email address to receive submitted proposals (default: bestitconsultingca@gmail.com)
+- `FROM_EMAIL`: Email sender address - must use `service@bestitconsulting.ca` (verified domain)
+- `PROPOSAL_SUBMIT_EMAIL`: Default receiver email for proposals when customer email not found (default: bestitconsultingca@gmail.com)
 
 ## 🔐 Security & Authentication
 
@@ -170,6 +175,7 @@ Documentation is in [`docs/`](./docs/). See [docs/readme.md](./docs/readme.md) f
 | [setup-auth](./docs/setup-auth.md) | JWT and authentication setup |
 | [user-guides](./docs/user-guides.md) | How to start and use the app in the UI |
 | [proposal-workflow-ui](./docs/proposal-workflow-ui.md) | Discover Jobs → Generate Proposal → Submit (with email) |
+| [email-system](./docs/email-system.md) | Complete email configuration, BCC archiving, and troubleshooting guide |
 | [huggingface-job-discovery](./docs/huggingface-job-discovery.md) | Job discovery (HuggingFace datasets) |
 | [chromadb-setup](./docs/chromadb-setup.md) | ChromaDB local vs Docker setup |
 | [web-scraping-status](./docs/web-scraping-status.md) | Web scraping status (not implemented) |

@@ -1,6 +1,6 @@
 /**
  * Proposals Page
- * 
+ *
  * Lists user proposals with tabs, filters and delete functionality.
  */
 
@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Trash2, Search, Filter, Calendar, DollarSign, Clock, Briefcase } from 'lucide-react'
+import { Trash2, Search, Filter, Calendar, DollarSign, Clock, Briefcase, Check, Edit, Award, X } from 'lucide-react'
 import { deleteProposal } from '@/lib/api/client'
 import { useToast } from '@/lib/toast/toast-context'
 import { cn } from '@/lib/utils'
@@ -64,16 +64,16 @@ export default function ProposalsPage() {
     try {
       await measureOperation('load-proposals', async () => {
         const { listProposals } = await import('@/lib/api/client')
-        
+
         const statusFilter = filters.status === 'all' ? undefined : filters.status
         const response = await listProposals(statusFilter, 100, 0)
-        
+
         let filtered = response.proposals
 
         // Apply Search
         if (filters.search) {
           const searchLower = filters.search.toLowerCase()
-          filtered = filtered.filter(p => 
+          filtered = filtered.filter(p =>
             p.title.toLowerCase().includes(searchLower) ||
             (p.description && p.description.toLowerCase().includes(searchLower))
           )
@@ -83,7 +83,7 @@ export default function ProposalsPage() {
         if (filters.platform !== 'all') {
           filtered = filtered.filter(p => p.job_platform?.toLowerCase() === filters.platform.toLowerCase())
         }
-        
+
         // Apply Sorting
         const sorted = [...filtered].sort((a, b) => {
           switch (filters.sortBy) {
@@ -97,7 +97,7 @@ export default function ProposalsPage() {
               return 0
           }
         })
-        
+
         setProposals(sorted)
       })
     } catch (error) {
@@ -178,8 +178,8 @@ export default function ProposalsPage() {
             onClick={() => setLocalFilters({ ...filters, status: tab.id })}
             className={cn(
               "px-4 py-3 text-sm font-medium transition-all relative whitespace-nowrap",
-              filters.status === tab.id 
-                ? "text-primary border-b-2 border-primary" 
+              filters.status === tab.id
+                ? "text-primary border-b-2 border-primary"
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
@@ -204,7 +204,7 @@ export default function ProposalsPage() {
             className="pl-10 h-10 bg-white dark:bg-slate-900"
           />
         </div>
-        
+
         <div className="flex gap-2 w-full lg:w-auto">
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-md border text-sm bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
             <Filter className="h-4 w-4 text-muted-foreground" />
@@ -262,7 +262,7 @@ export default function ProposalsPage() {
                 proposal.status === 'lost' ? "bg-red-500" :
                 proposal.status === 'draft' ? "bg-slate-400" : "bg-primary"
               )} />
-              
+
               <CardContent className="p-5 md:p-6">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div className="flex-1 space-y-1">
@@ -271,9 +271,24 @@ export default function ProposalsPage() {
                         {proposal.title}
                       </h3>
                       <Badge
-                        variant={proposal.status === 'won' ? 'default' : proposal.status === 'lost' ? 'destructive' : 'secondary'}
-                        className="capitalize px-2 py-0 text-[10px]"
+                        variant={
+                          proposal.status === 'won' ? 'default' :
+                          proposal.status === 'lost' ? 'destructive' :
+                          proposal.status === 'draft' ? 'outline' :
+                          'secondary'
+                        }
+                        className={cn(
+                          "capitalize px-2 py-0.5 text-[10px] font-semibold flex items-center gap-1",
+                          proposal.status === 'draft' && "text-yellow-700 border-yellow-300 bg-yellow-50 dark:text-yellow-300 dark:border-yellow-700 dark:bg-yellow-950",
+                          proposal.status === 'submitted' && "bg-green-50 text-green-700 border-green-300 dark:bg-green-950 dark:text-green-300 dark:border-green-700",
+                          proposal.status === 'won' && "bg-emerald-600 text-white",
+                          proposal.status === 'lost' && "bg-red-600 text-white"
+                        )}
                       >
+                        {proposal.status === 'draft' && <Edit className="h-3 w-3" />}
+                        {proposal.status === 'submitted' && <Check className="h-3 w-3" />}
+                        {proposal.status === 'won' && <Award className="h-3 w-3" />}
+                        {proposal.status === 'lost' && <X className="h-3 w-3" />}
                         {proposal.status}
                       </Badge>
                     </div>

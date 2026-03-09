@@ -52,20 +52,20 @@ async def list_proposals(
 ) -> List[Proposal]:
     """List proposals for a user with optional filtering."""
     db = await get_db_pool()
-    
+
     query = """
-        SELECT * FROM proposals 
+        SELECT * FROM proposals
         WHERE user_id = $1
     """
     params = [user_id]
-    
+
     if status:
         query += f" AND status = ${len(params) + 1}"
         params.append(status)
-    
+
     query += f" ORDER BY created_at DESC LIMIT ${len(params) + 1} OFFSET ${len(params) + 2}"
     params.extend([limit, offset])
-    
+
     rows = await db.fetch(query, *params)
     return [_row_to_proposal(dict(row)) for row in rows]
 
@@ -73,13 +73,13 @@ async def list_proposals(
 async def get_proposal(proposal_id: UUID, user_id: UUID) -> Optional[Proposal]:
     """Get a single proposal by ID."""
     db = await get_db_pool()
-    
+
     row = await db.fetchrow(
         "SELECT * FROM proposals WHERE id = $1 AND user_id = $2",
         proposal_id,
         user_id,
     )
-    
+
     if not row:
         return None
 
@@ -130,10 +130,10 @@ async def create_proposal(
         """
         INSERT INTO proposals (
             user_id, title, description, budget, timeline, skills,
-            project_id, job_url, job_platform, client_name, strategy_id,
+            project_id, job_url, job_platform, client_name, recipient_email, strategy_id,
             generated_with_ai, ai_model_used, status
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
         RETURNING *
         """,
         user_id,
@@ -146,6 +146,7 @@ async def create_proposal(
         proposal_data.job_url,
         proposal_data.job_platform,
         proposal_data.client_name,
+        proposal_data.recipient_email,
         UUID(proposal_data.strategy_id) if proposal_data.strategy_id else None,
         proposal_data.generated_with_ai,
         proposal_data.ai_model_used,
@@ -160,9 +161,10 @@ async def create_proposal(
             from app.config import settings
             from app.services.notification_service import send_proposal_submission_email
 
-            await send_proposal_submission_email(
-                settings.proposal_submit_email, proposal
-            )
+            # Use recipient_email from proposal, or fall back to default
+            recipient = proposal_data.recipient_email or settings.proposal_submit_email
+            if recipient:
+                await send_proposal_submission_email(recipient, proposal)
         except Exception as e:
             import logging
 
@@ -235,32 +237,32 @@ async def update_proposal(
 ) -> Optional[Proposal]:
     """Update an existing proposal."""
     db = await get_db_pool()
-    
+
     # Build dynamic update query
     update_fields = []
     params = []
     param_idx = 1
-    
+
     if proposal_data.title is not None:
         update_fields.append(f"title = ${param_idx}")
         params.append(proposal_data.title)
         param_idx += 1
-    
+
     if proposal_data.description is not None:
         update_fields.append(f"description = ${param_idx}")
         params.append(proposal_data.description)
         param_idx += 1
-    
+
     if proposal_data.budget is not None:
         update_fields.append(f"budget = ${param_idx}")
         params.append(proposal_data.budget)
         param_idx += 1
-    
+
     if proposal_data.timeline is not None:
         update_fields.append(f"timeline = ${param_idx}")
         params.append(proposal_data.timeline)
         param_idx += 1
-    
+
     if proposal_data.skills is not None:
         update_fields.append(f"skills = ${param_idx}")
         params.append(proposal_data.skills)
@@ -270,67 +272,67 @@ async def update_proposal(
         update_fields.append(f"project_id = ${param_idx}")
         params.append(UUID(proposal_data.job_id) if proposal_data.job_id else None)
         param_idx += 1
-    
+
     if proposal_data.job_url is not None:
         update_fields.append(f"job_url = ${param_idx}")
         params.append(proposal_data.job_url)
         param_idx += 1
-    
+
     if proposal_data.job_platform is not None:
         update_fields.append(f"job_platform = ${param_idx}")
         params.append(proposal_data.job_platform)
         param_idx += 1
-    
+
     if proposal_data.client_name is not None:
         update_fields.append(f"client_name = ${param_idx}")
         params.append(proposal_data.client_name)
         param_idx += 1
-    
+
     if proposal_data.strategy_id is not None:
         update_fields.append(f"strategy_id = ${param_idx}")
         params.append(UUID(proposal_data.strategy_id) if proposal_data.strategy_id else None)
         param_idx += 1
-    
+
     if proposal_data.status is not None:
         update_fields.append(f"status = ${param_idx}")
         params.append(proposal_data.status)
         param_idx += 1
-    
+
     if not update_fields:
         # Nothing to update
         return await get_proposal(proposal_id, user_id)
-    
+
     # Add updated_at
     update_fields.append(f"updated_at = NOW()")
-    
+
     # Add WHERE clause parameters
     params.extend([proposal_id, user_id])
-    
+
     query = f"""
         UPDATE proposals
         SET {', '.join(update_fields)}
         WHERE id = ${param_idx} AND user_id = ${param_idx + 1}
         RETURNING *
     """
-    
+
     row = await db.fetchrow(query, *params)
-    
+
     if not row:
         return None
-    
+
     return _row_to_proposal(dict(row))
 
 
 async def delete_proposal(proposal_id: UUID, user_id: UUID) -> bool:
     """Delete a proposal."""
     db = await get_db_pool()
-    
+
     result = await db.execute(
         "DELETE FROM proposals WHERE id = $1 AND user_id = $2",
         proposal_id,
         user_id,
     )
-    
+
     return result == "DELETE 1"
 
 
@@ -341,12 +343,12 @@ async def submit_from_draft(
 ) -> Optional[Proposal]:
     """Convert a draft to a final proposal and delete the draft."""
     db = await get_db_pool()
-    
+
     # Get the draft
     if entity_id == "new":
         draft_row = await db.fetchrow(
             """
-            SELECT * FROM draft_work 
+            SELECT * FROM draft_work
             WHERE user_id = $1 AND entity_type = $2 AND entity_id IS NULL
             """,
             user_id,
@@ -358,7 +360,7 @@ async def submit_from_draft(
             target_id = UUID(entity_id)
             draft_row = await db.fetchrow(
                 """
-                SELECT * FROM draft_work 
+                SELECT * FROM draft_work
                 WHERE user_id = $1 AND entity_type = $2 AND entity_id = $3
                 """,
                 user_id,
@@ -367,15 +369,15 @@ async def submit_from_draft(
             )
         except ValueError:
             return None
-    
+
     if not draft_row:
         return None
-    
+
     # Parse draft data
     draft_data = draft_row["draft_data"]
     if isinstance(draft_data, str):
         draft_data = json.loads(draft_data)
-    
+
     # Extract skills
     raw_skills = draft_data.get("skills", [])
     if isinstance(raw_skills, str):
@@ -395,30 +397,19 @@ async def submit_from_draft(
             job_url=draft_data.get("job_url") or draft_data.get("jobUrl"),
             job_platform=draft_data.get("job_platform") or draft_data.get("jobPlatform"),
             client_name=draft_data.get("client_name") or draft_data.get("jobCompany"),
+            recipient_email=draft_data.get("recipient_email") or draft_data.get("recipientEmail"),
             strategy_id=draft_data.get("strategy_id") or draft_data.get("strategy_used") or draft_data.get("strategyId"),
             generated_with_ai=draft_data.get("generated_with_ai") or draft_data.get("generatedWithAi") or False,
             ai_model_used=draft_data.get("ai_model_used") or draft_data.get("aiModelUsed"),
             status="submitted",
         ),
     )
-    
+
     # Delete the draft
     await db.execute(
         "DELETE FROM draft_work WHERE id = $1",
         draft_row["id"],
     )
-    
-    # If the project has a test_email, send the proposal there (for testing)
-    if proposal.job_id:
-        try:
-            from app.services.project_service import get_project_by_id
-            project = await get_project_by_id(proposal.job_id)
-            if project and project.get("test_email"):
-                from app.services.notification_service import send_test_proposal_email
-                await send_test_proposal_email(project["test_email"], proposal)
-        except Exception as e:
-            # Don't fail the submission if email fails
-            import logging
-            logging.getLogger(__name__).warning(f"Failed to send test proposal email: {e}")
+
 
     return proposal

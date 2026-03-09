@@ -23,6 +23,12 @@ class ProposalGenerateRequest(BaseModel):
 
     strategy_id: Optional[str] = Field(None, description="Bidding strategy UUID to use")
 
+    # Optional: limit RAG to specific collections (default: all)
+    collections: Optional[List[str]] = Field(
+        None,
+        description="Knowledge base collections to use for RAG (case_studies, team_profiles, portfolio, other). Empty/None = all.",
+    )
+
     # Optional context overrides
     extra_context: Optional[str] = Field(None, description="Additional context to provide to the AI")
     custom_instructions: Optional[str] = Field(None, description="Custom instructions for this specific proposal")

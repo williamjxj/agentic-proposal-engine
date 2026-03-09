@@ -226,8 +226,13 @@ class AIService:
             convert_to_numpy=True
         )[0].tolist()
 
-        # Search multiple collections (portfolio + other→general_kb per research.md)
-        collections = ["case_studies", "team_profiles", "portfolio", "general_kb"]
+        # Search collections: use request.collections if specified, else all
+        default_collections = ["case_studies", "team_profiles", "portfolio", "general_kb"]
+        collections = (
+            [c if c != "other" else "general_kb" for c in request.collections]
+            if request.collections
+            else default_collections
+        )
         all_relevant_chunks = []
 
         for coll in collections:

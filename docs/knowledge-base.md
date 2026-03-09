@@ -772,6 +772,7 @@ async def test_upload_with_supplemental_info():
 
 ## Related Documentation
 
+- [AI Proposal Generation — Concepts](./ai-proposal-generation-concepts.md) - How collections, keywords, and RAG connect in proposal generation
 - [chromadb-setup.md](./chromadb-setup.md) - ChromaDB hybrid mode setup
 - [chromadb-implementation-summary.md](./chromadb-implementation-summary.md) - ChromaDB implementation details
 - [chromadb-upgrade-guide.md](./chromadb-upgrade-guide.md) - Upgrading ChromaDB client

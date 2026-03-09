@@ -91,11 +91,44 @@ class Settings(BaseSettings):
     resend_api_key: Optional[str] = Field(None, alias="RESEND_API_KEY")
     auto_proposal_threshold: float = Field(default=0.85, alias="AUTO_PROPOSAL_THRESHOLD")
 
-    # Proposal submission email (sent to customer on Submit Proposal)
+    # Email Testing Configuration
+    # When TEST_MODE=true, all emails go to TEST_EMAIL instead of actual recipients
+    # This allows testing without sending to real customer emails
+    test_mode: bool = Field(default=False, alias="TEST_MODE")
+    test_email: Optional[str] = Field(None, alias="TEST_EMAIL")
+
+    # Email sender address (FROM field) - MUST be from a verified domain in Resend
+    # Default: service@bestitconsulting.ca (verified domain)
+    from_email: str = Field(
+        default="service@bestitconsulting.ca",
+        alias="FROM_EMAIL",
+    )
+
+    # BCC email - receives copy of all sent proposals for archiving
+    # Leave blank to disable BCC feature
+    bcc_email: str | None = Field(
+        default="bestitconsultingca@gmail.com",
+        alias="BCC_EMAIL",
+    )
+
+    # Proposal submission email (receiver/TO field) - fallback when customer email not found
+    # Can be any valid email address
     proposal_submit_email: str = Field(
         default="bestitconsultingca@gmail.com",
         alias="PROPOSAL_SUBMIT_EMAIL",
     )
+
+    # Company Contact Information (for email signatures and branding)
+    company_name: str = Field(default="Best IT Consulting", alias="COMPANY_NAME")
+    company_website: str = Field(default="https://www.bestitconsulting.ca", alias="COMPANY_WEBSITE")
+    company_phone: str = Field(default="(236) 992-3846", alias="COMPANY_PHONE")
+    company_email: str = Field(default="service@bestitconsulting.ca", alias="COMPANY_EMAIL")
+
+    # User Profile (for proposal signatures)
+    user_full_name: str = Field(default="William Jiang", alias="USER_FULL_NAME")
+    user_title: str = Field(default="Co-Founder / Full-Stack & AI Engineer", alias="USER_TITLE")
+    user_linkedin: Optional[str] = Field(default=None, alias="USER_LINKEDIN")
+    user_github: Optional[str] = Field(default=None, alias="USER_GITHUB")
 
     # Workflow Optimization Configuration
     session_state_ttl_hours: int = Field(default=24, alias="SESSION_STATE_TTL_HOURS")

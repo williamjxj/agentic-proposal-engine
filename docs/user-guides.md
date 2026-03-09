@@ -53,6 +53,8 @@ Click **Generate Proposal** on a job card. You are taken to the proposal form wi
 
 Click **AI Generate** next to the Description field. The backend uses RAG (your knowledge base) + strategy + LLM to produce a tailored proposal draft.
 
+**Want to understand how it all connects?** See [AI Proposal Generation — Concepts](ai-proposal-generation-concepts.md) for how Knowledge Base, Keywords, Required Skills, and the Collection selector work together.
+
 ### 6. Submit
 
 Review the proposal, edit if needed, then click **Submit Proposal**. The proposal is created directly from the form and saved to your Proposals list. Drafts auto-save in the background (~300ms) for recovery if you leave the page.
@@ -67,4 +69,4 @@ Review the proposal, edit if needed, then click **Submit Proposal**. The proposa
 
 ---
 
-**Related:** [proposal-workflow-ui.md](proposal-workflow-ui.md) | [huggingface-job-discovery.md](huggingface-job-discovery.md)
+**Related:** [ai-proposal-generation-concepts.md](ai-proposal-generation-concepts.md) | [proposal-workflow-ui.md](proposal-workflow-ui.md) | [huggingface-job-discovery.md](huggingface-job-discovery.md)

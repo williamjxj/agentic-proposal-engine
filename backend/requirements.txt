@@ -47,6 +47,7 @@ apscheduler>=3.10.0
 
 # Notifications (004-improve-autonomous)
 resend>=2.0.0
+markdown>=3.10.0  # Convert markdown to HTML for emails
 
 # Utilities
 python-dotenv==1.0.1

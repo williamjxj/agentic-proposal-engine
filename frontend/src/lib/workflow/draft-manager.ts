@@ -21,6 +21,8 @@ export interface DraftGetOptions {
   entityType: string
   entityId: string | null
   useCache?: boolean
+  /** If true, skip the API call when cache is empty. Use when we don't expect a server-side draft (e.g. first visit, no prior auto-save). */
+  skipApiWhenCacheEmpty?: boolean
 }
 
 export class DraftManager {
@@ -70,7 +72,7 @@ export class DraftManager {
    * Get draft from server or cache
    */
   async getDraft(options: DraftGetOptions): Promise<DraftWork | null> {
-    const { entityType, entityId, useCache = true } = options
+    const { entityType, entityId, useCache = true, skipApiWhenCacheEmpty = false } = options
 
     try {
       // Try cache first if enabled
@@ -92,9 +94,13 @@ export class DraftManager {
             updatedAt: new Date().toISOString(),
           }
         }
+        // Cache empty and skipApiWhenCacheEmpty: don't call API (no draft to recover)
+        if (skipApiWhenCacheEmpty) {
+          return null
+        }
       }
 
-      // Fetch from server
+      // Fetch from server (only when cache missed and we didn't skip)
       const entityIdParam = entityId || 'new'
       const result = await apiGetDraft(entityType, entityIdParam)
 

@@ -12,6 +12,8 @@ The Proposals feature is the core workflow of the Auto-Bidder application, enabl
 2. **Auto-Save & Draft Recovery** - Automatic background saving with crash recovery
 3. **Draft Workflow** - Save visible drafts or submit final proposals
 
+> **Understanding the inputs:** See [AI Proposal Generation — Concepts](./ai-proposal-generation-concepts.md) for how Knowledge Base, Keywords, Required Skills, and the Collection selector work together.
+
 ---
 
 ## Architecture
@@ -924,6 +926,7 @@ curl -X POST http://localhost:8000/api/proposals/generate-from-job \
 
 ## Related Documentation
 
+- [AI Proposal Generation — Concepts](./ai-proposal-generation-concepts.md) - How Knowledge Base, Keywords, Required Skills, and Collection selector connect
 - [Knowledge Base Documentation](./knowledge-base.md) - Document upload and management
 - [Strategies Documentation](./strategies.md) - Proposal tone and approach
 - [Job Discovery Documentation](./huggingface-job-discovery.md) - Finding jobs to bid on

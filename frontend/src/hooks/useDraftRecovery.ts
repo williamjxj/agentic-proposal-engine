@@ -58,6 +58,7 @@ export function useDraftRecovery(options: UseDraftRecoveryOptions): UseDraftReco
         entityType,
         entityId,
         useCache: true,
+        skipApiWhenCacheEmpty: true, // Only call API when cache suggests a draft exists; avoid unnecessary calls on first visit
       })
 
       if (existingDraft && existingDraft.draftData) {

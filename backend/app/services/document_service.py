@@ -182,7 +182,7 @@ class DocumentService:
             doc_title = title or Path(filename).stem
 
             # Save file to local storage: backend/data/kb/{user_id}/{document_id}.{ext}
-            storage_dir = Path(settings.kb_storage_dir) / user_id
+            storage_dir = Path(settings.kb_storage_dir) / str(user_id)
             storage_dir.mkdir(parents=True, exist_ok=True)
 
             file_path = storage_dir / f"{document_id}{file_ext}"

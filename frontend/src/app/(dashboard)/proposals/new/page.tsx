@@ -25,7 +25,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { Loader2 } from 'lucide-react'
-import { generateProposalFromJob, getProject, listStrategies } from '@/lib/api/client'
+import { generateProposalFromJob, getProject, listStrategies, listKeywords } from '@/lib/api/client'
 import { useToast } from '@/lib/toast/toast-context'
 
 interface ProposalFormData {
@@ -34,6 +34,7 @@ interface ProposalFormData {
   budget: string
   timeline: string
   skills: string
+  recipientEmail: string
 }
 
 interface JobContext {
@@ -57,6 +58,7 @@ function NewProposalPageContent() {
     budget: '',
     timeline: '',
     skills: '',
+    recipientEmail: '',
   })
   const [isInitialized, setIsInitialized] = useState(false)
   const [isLoaded, setIsLoaded] = useState(false)
@@ -68,6 +70,8 @@ function NewProposalPageContent() {
   const [aiError, setAiError] = useState<string | null>(null)
   const [strategies, setStrategies] = useState<{ id: string; name: string; is_default?: boolean }[]>([])
   const [selectedStrategyId, setSelectedStrategyId] = useState<string | null>(null)
+  const [selectedCollections, setSelectedCollections] = useState<string>('all') // 'all' | collection name
+  const [keywords, setKeywords] = useState<{ id: string; keyword: string }[]>([])
 
   // Stable jobId for effect deps – avoids searchParams reference changes causing re-run storms
   const jobId = searchParams.get('jobId')
@@ -102,12 +106,19 @@ function NewProposalPageContent() {
         budget: budgetStr,
         model_response: p.model_response,
       })
+
+      // Extract email from job description
+      const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/
+      const emailMatch = (p.description || '').match(emailRegex)
+      const extractedEmail = emailMatch ? emailMatch[0] : process.env.NEXT_PUBLIC_DEFAULT_PROPOSAL_EMAIL || 'bestitconsultingca@gmail.com'
+
       setFormData((prev) => ({
         ...prev,
         title: `Proposal for: ${p.title}`,
         budget: budgetStr || prev.budget,
         skills: skillsStr || prev.skills,
         description: prev.description || `I am interested in your project "${p.title}". `,
+        recipientEmail: extractedEmail,
       }))
     }
 
@@ -170,6 +181,7 @@ function NewProposalPageContent() {
             budget: p.budget || '',
             timeline: p.timeline || '',
             skills: Array.isArray(p.skills) ? p.skills.join(', ') : '',
+            recipientEmail: p.recipient_email || process.env.NEXT_PUBLIC_DEFAULT_PROPOSAL_EMAIL || 'bestitconsultingca@gmail.com',
           })
           if (p.job_id) {
             setJobContext({
@@ -214,6 +226,7 @@ function NewProposalPageContent() {
           budget: draftData.budget || '',
           timeline: draftData.timeline || '',
           skills: draftData.skills || '',
+          recipientEmail: draftData.recipientEmail || process.env.NEXT_PUBLIC_DEFAULT_PROPOSAL_EMAIL || 'bestitconsultingca@gmail.com',
         })
 
         if (draftData.jobId) {
@@ -238,6 +251,7 @@ function NewProposalPageContent() {
         budget: '',
         timeline: '',
         skills: '',
+        recipientEmail: process.env.NEXT_PUBLIC_DEFAULT_PROPOSAL_EMAIL || 'bestitconsultingca@gmail.com',
       })
     },
   })
@@ -301,11 +315,19 @@ function NewProposalPageContent() {
   useEffect(() => {
     listStrategies()
       .then((list) => {
-        setStrategies(list)
-        const defaultStrategy = list.find((s) => s.is_default)
+        const arr = Array.isArray(list) ? list : []
+        setStrategies(arr)
+        const defaultStrategy = arr.find((s) => s.is_default)
         if (defaultStrategy) setSelectedStrategyId(defaultStrategy.id)
-        else if (list.length) setSelectedStrategyId(list[0].id)
+        else if (arr.length) setSelectedStrategyId(arr[0].id)
       })
+      .catch(() => {})
+  }, [])
+
+  // Load active keywords (used automatically by AI generate)
+  useEffect(() => {
+    listKeywords({ is_active: true })
+      .then((list) => setKeywords(list.map((k) => ({ id: k.id, keyword: k.keyword }))))
       .catch(() => {})
   }, [])
 
@@ -336,6 +358,7 @@ function NewProposalPageContent() {
         budget: formData.budget?.trim() || undefined,
         timeline: formData.timeline?.trim() || undefined,
         skills: skillsArr,
+        recipient_email: formData.recipientEmail?.trim() || undefined,
         job_id: jobContext?.id,
         job_platform: jobContext?.platform,
         client_name: jobContext?.company,
@@ -387,6 +410,10 @@ function NewProposalPageContent() {
         job_skills: jobContext.skills ? jobContext.skills.split(',').map((s) => s.trim()) : undefined,
         job_model_response: jobContext.model_response,
         strategy_id: selectedStrategyId || undefined,
+        collections:
+          selectedCollections && selectedCollections !== 'all'
+            ? [selectedCollections]
+            : undefined,
       })
 
       if (generated) {
@@ -618,24 +645,68 @@ function NewProposalPageContent() {
               </div>
             )}
             {strategies.length > 0 && (
-              <div className="mt-3 pt-3 border-t flex items-center gap-3">
-                <Label className="text-xs font-medium whitespace-nowrap">Strategy:</Label>
-                <Select
-                  value={selectedStrategyId || ''}
-                  onValueChange={(v) => setSelectedStrategyId(v || null)}
-                >
-                  <SelectTrigger className="w-50 h-9 text-xs">
-                    <SelectValue placeholder="Select strategy" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {strategies.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.name}{s.is_default ? ' (default)' : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <span className="text-xs text-muted-foreground">Choose the tone and approach for your proposal</span>
+              <div className="mt-3 pt-3 border-t space-y-3">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <Label className="text-xs font-medium whitespace-nowrap">Strategy:</Label>
+                  <Select
+                    value={selectedStrategyId || ''}
+                    onValueChange={(v) => setSelectedStrategyId(v || null)}
+                  >
+                    <SelectTrigger className="w-50 h-9 text-xs min-w-[200px]">
+                      <SelectValue placeholder="Select strategy" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[300px]">
+                      {strategies.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.name}{s.is_default ? ' (default)' : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <span className="text-xs text-muted-foreground">Choose the tone and approach for your proposal</span>
+                </div>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <Label className="text-xs font-medium whitespace-nowrap">Knowledge base:</Label>
+                  <Select
+                    value={selectedCollections}
+                    onValueChange={setSelectedCollections}
+                  >
+                    <SelectTrigger className="w-50 h-9 text-xs min-w-[180px]">
+                      <SelectValue placeholder="Select collection" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All collections (default)</SelectItem>
+                      <SelectItem value="case_studies">Case Studies</SelectItem>
+                      <SelectItem value="team_profiles">Team Profiles</SelectItem>
+                      <SelectItem value="portfolio">Portfolio</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <span className="text-xs text-muted-foreground">Which KB to use for RAG context</span>
+                </div>
+                {keywords.length > 0 && (
+                  <div className="flex items-start gap-2">
+                    <Label className="text-xs font-medium whitespace-nowrap pt-1">Keywords used:</Label>
+                    <div className="flex-1 flex flex-wrap gap-1.5">
+                      {keywords.map((k) => (
+                        <span
+                          key={k.id}
+                          className="inline-flex items-center px-2 py-0.5 rounded-md bg-primary/10 text-primary text-xs"
+                        >
+                          {k.keyword}
+                        </span>
+                      ))}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="link"
+                      className="text-xs h-auto p-0"
+                      onClick={() => router.push('/keywords')}
+                    >
+                      Manage
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </CardContent>
@@ -705,6 +776,23 @@ function NewProposalPageContent() {
               className="mt-2"
             />
           </div>
+        </div>
+
+        {/* Recipient Email */}
+        <div>
+          <Label htmlFor="recipientEmail">Recipient Email *</Label>
+          <Input
+            type="email"
+            id="recipientEmail"
+            value={formData.recipientEmail}
+            onChange={(e) => handleChange('recipientEmail', e.target.value)}
+            required
+            placeholder="customer@example.com"
+            className="mt-2"
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            Email address where the proposal will be sent. Auto-detected from job description.
+          </p>
         </div>
 
         {/* Skills */}
