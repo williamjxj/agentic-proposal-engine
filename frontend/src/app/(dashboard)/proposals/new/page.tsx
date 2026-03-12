@@ -25,7 +25,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Send, Save, X } from 'lucide-react'
 import { generateProposalFromJob, getProject, listStrategies, listKeywords } from '@/lib/api/client'
 import { useToast } from '@/lib/toast/toast-context'
 
@@ -816,7 +816,7 @@ function NewProposalPageContent() {
             className="mt-2"
           />
           <p className="text-xs text-muted-foreground mt-1">
-            💡 These skills help the AI emphasize your expertise during generation.
+            💡 List your relevant skills (e.g., React, Python, AWS). The AI will emphasize these in your proposal.
           </p>
         </div>
 
@@ -824,16 +824,19 @@ function NewProposalPageContent() {
         <div className="flex items-center gap-4 pt-4 border-t">
           <Button
             type="submit"
-            className="shimmer-button"
+            className="shimmer-button flex items-center gap-1.5"
             disabled={isSubmitting}
           >
             {isSubmitting ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin shrink-0 mr-2" />
+                <Loader2 className="h-4 w-4 animate-spin shrink-0" />
                 Submitting...
               </>
             ) : (
-              editId ? 'Update Proposal' : 'Submit Proposal'
+              <>
+                <Send className="h-4 w-4" />
+                {editId ? 'Update Proposal' : 'Submit Proposal'}
+              </>
             )}
           </Button>
           <Button
@@ -841,21 +844,27 @@ function NewProposalPageContent() {
             variant="secondary"
             onClick={(e) => handleSubmit(e as any, true)}
             disabled={isSubmitting}
+            className="flex items-center gap-1.5"
           >
             {isSubmitting ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin shrink-0 mr-2" />
+                <Loader2 className="h-4 w-4 animate-spin shrink-0" />
                 Saving...
               </>
             ) : (
-              'Save as Draft'
+              <>
+                <Save className="h-4 w-4" />
+                Save as Draft
+              </>
             )}
           </Button>
           <Button
             type="button"
             variant="outline"
             onClick={() => router.push(editId ? `/proposals/${editId}` : '/proposals')}
+            className="flex items-center gap-1.5"
           >
+            <X className="h-4 w-4" />
             Cancel
           </Button>
 

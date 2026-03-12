@@ -1,11 +1,12 @@
 /**
  * Keyword List Component
- * 
+ *
  * Displays a list of keywords with actions.
  */
 
 'use client'
 
+import { Edit, Trash2 } from 'lucide-react'
 import type { Keyword } from '@/types/keywords'
 
 interface KeywordListProps {
@@ -63,14 +64,18 @@ export function KeywordList({ keywords, onEdit, onDelete }: KeywordListProps) {
             <div className="flex items-center gap-2 ml-4">
               <button
                 onClick={() => onEdit(keyword.id)}
-                className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+                className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800 flex items-center gap-1.5"
+                title="Edit keyword"
               >
+                <Edit className="h-4 w-4" />
                 Edit
               </button>
               <button
                 onClick={() => onDelete(keyword.id)}
-                className="rounded-md border border-red-300 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
+                className="rounded-md border border-red-300 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20 flex items-center gap-1.5"
+                title="Delete keyword"
               >
+                <Trash2 className="h-4 w-4" />
                 Delete
               </button>
             </div>

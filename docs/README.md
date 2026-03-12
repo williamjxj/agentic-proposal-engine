@@ -33,6 +33,7 @@ Welcome to the Agentic Proposal Engine documentation. This folder contains all p
 **Setup & Deployment**:
 - [setup-and-run.md](setup-and-run.md) - Quick start guide
 - [setup-auth.md](setup-auth.md) - Authentication setup
+- [railway-deployment-guide.md](railway-deployment-guide.md) - **Railway deployment (Recommended)**
 - [production-deployment.md](production-deployment.md) - Production deployment guide
 
 ---

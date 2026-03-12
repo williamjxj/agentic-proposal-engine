@@ -1,6 +1,6 @@
 /**
  * Settings Page
- * 
+ *
  * Manages user preferences and platform credentials.
  */
 
@@ -20,6 +20,7 @@ import { PageHeader } from '@/components/shared/page-header'
 import { PageContainer } from '@/components/shared/page-container'
 import { useToast } from '@/lib/toast/toast-context'
 import { Button } from '@/components/ui/button'
+import { Key } from 'lucide-react'
 
 export default function SettingsPage() {
   const toast = useToast()
@@ -97,7 +98,10 @@ export default function SettingsPage() {
       <section className="rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-xl font-semibold">Platform Credentials</h2>
-          <Button onClick={handleCreate}>Add Credential</Button>
+          <Button onClick={handleCreate} className="flex items-center gap-1.5">
+            <Key className="h-4 w-4" />
+            Add Credential
+          </Button>
         </div>
 
         {/* Error Display */}

@@ -1,6 +1,6 @@
 /**
  * Keywords Page
- * 
+ *
  * Lists user keywords with filters and state preservation.
  * Integrates with session context for seamless navigation.
  */
@@ -8,6 +8,7 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
+import { Plus } from 'lucide-react'
 import { useSessionState } from '@/hooks/useSessionState'
 import { useNavigationTiming } from '@/hooks/useNavigationTiming'
 import { LoadingSkeleton } from '@/components/workflow/progress-overlay'
@@ -127,7 +128,10 @@ export default function KeywordsPage() {
         title="Keywords"
         description="Manage search keywords for job discovery"
       >
-        <Button onClick={handleCreate}>Add Keyword</Button>
+        <Button onClick={handleCreate} className="flex items-center gap-1.5">
+          <Plus className="h-4 w-4" />
+          Add Keyword
+        </Button>
       </PageHeader>
 
       {/* Filters */}
@@ -139,7 +143,7 @@ export default function KeywordsPage() {
           onChange={(e) => setLocalFilters({ ...filters, search: e.target.value })}
           className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
         />
-        
+
         <select
           value={filters.is_active === undefined ? 'all' : filters.is_active ? 'active' : 'inactive'}
           onChange={(e) => {

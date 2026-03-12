@@ -128,6 +128,11 @@ class Settings(BaseSettings):
     company_website: str = Field(default="https://www.bestitconsulting.ca", alias="COMPANY_WEBSITE")
     company_phone: str = Field(default="(236) 992-3846", alias="COMPANY_PHONE")
     company_email: str = Field(default="service@bestitconsulting.ca", alias="COMPANY_EMAIL")
+    company_logo_url: str = Field(
+        default="https://www.bestitconsulting.ca/logo.png",
+        alias="COMPANY_LOGO_URL",
+        description="Public URL for company logo in email signatures (must be accessible to email clients)"
+    )
 
     # User Profile (for proposal signatures)
     user_full_name: str = Field(default="William Jiang", alias="USER_FULL_NAME")

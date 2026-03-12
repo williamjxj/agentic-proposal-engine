@@ -8,7 +8,7 @@
 
 import { useState, useRef } from 'react'
 import { useUploadDocument } from '@/hooks/useKnowledgeBase'
-import { Loader2 } from 'lucide-react'
+import { Loader2, X, Upload } from 'lucide-react'
 import type { DocumentCollection } from '@/types/knowledge-base'
 
 interface DocumentUploadProps {
@@ -101,9 +101,11 @@ export function DocumentUpload({ onSuccess, onClose }: DocumentUploadProps) {
           <h2 className="text-xl font-semibold">Upload Document</h2>
           <button
             onClick={onClose}
-            className="text-muted-foreground hover:text-foreground"
+            className="text-muted-foreground hover:text-foreground p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
+            aria-label="Close"
+            title="Close"
           >
-            ✕
+            <X className="h-5 w-5" />
           </button>
         </div>
 
@@ -279,22 +281,26 @@ export function DocumentUpload({ onSuccess, onClose }: DocumentUploadProps) {
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+              className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800 flex items-center gap-1.5"
             >
+              <X className="h-4 w-4" />
               Cancel
             </button>
             <button
               type="submit"
               disabled={uploadMutation.isPending || !selectedFile}
-              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 min-w-[100px]"
+              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 min-w-[100px]"
             >
               {uploadMutation.isPending ? (
-                <span className="flex items-center gap-2">
+                <>
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Uploading...
-                </span>
+                </>
               ) : (
-                'Upload'
+                <>
+                  <Upload className="h-4 w-4" />
+                  Upload
+                </>
               )}
             </button>
           </div>

@@ -109,7 +109,7 @@ uvicorn app.main:app --reload --port 8000
 
 **Frontend:** Vercel • **Backend:** Railway/Fly.io • **Database:** PostgreSQL
 
-📄 [Production deployment guide](./docs/production-deployment.md)
+📄 [Railway deployment guide (Recommended)](./docs/railway-deployment-guide.md) | [Production deployment guide](./docs/production-deployment.md)
 
 ## 📄 License
 

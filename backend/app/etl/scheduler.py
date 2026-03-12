@@ -103,9 +103,22 @@ def start_scheduler() -> None:
         )
         logger.info("Autonomous discovery job added (every 15 minutes)")
 
+    # Project scoring: run nightly at 2 AM for all active users
+    from app.tasks.scoring_tasks import score_projects_for_all_active_users
+    from apscheduler.triggers.cron import CronTrigger
+
+    sched.add_job(
+        score_projects_for_all_active_users,
+        CronTrigger(hour=2, minute=0),  # 2:00 AM daily
+        id="project_scoring",
+        replace_existing=True,
+        kwargs={"limit_per_user": 50}  # Score up to 50 projects per user
+    )
+    logger.info("Project scoring job added (daily at 2 AM)")
+
     sched.start()
     logger.info(
-        "ETL scheduler started; HF every %s h, Freelancer every %s h",
+        "ETL scheduler started; HF every %s h, Freelancer every %s h, Scoring daily",
         hours,
         fl_hours,
     )

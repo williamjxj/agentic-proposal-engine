@@ -9,6 +9,7 @@
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Trash2, RefreshCw, Link, Mail, Phone, User } from 'lucide-react'
 import type { Document } from '@/types/knowledge-base'
 
 interface DocumentListProps {
@@ -90,7 +91,7 @@ export function DocumentList({ documents, onDelete, onReprocess }: DocumentListP
                         rel="noopener noreferrer"
                         className="text-blue-600 hover:underline dark:text-blue-400 flex items-center gap-1"
                       >
-                        🔗 Reference
+                        <Link className="h-3.5 w-3.5" /> Reference
                       </a>
                     )}
                     {document.email && (
@@ -98,7 +99,7 @@ export function DocumentList({ documents, onDelete, onReprocess }: DocumentListP
                         href={`mailto:${document.email}`}
                         className="text-blue-600 hover:underline dark:text-blue-400 flex items-center gap-1"
                       >
-                        📧 {document.email}
+                        <Mail className="h-3.5 w-3.5" /> {document.email}
                       </a>
                     )}
                     {document.phone && (
@@ -106,7 +107,7 @@ export function DocumentList({ documents, onDelete, onReprocess }: DocumentListP
                         href={`tel:${document.phone}`}
                         className="text-blue-600 hover:underline dark:text-blue-400 flex items-center gap-1"
                       >
-                        📞 {document.phone}
+                        <Phone className="h-3.5 w-3.5" /> {document.phone}
                       </a>
                     )}
                     {document.contact_url && (
@@ -116,7 +117,7 @@ export function DocumentList({ documents, onDelete, onReprocess }: DocumentListP
                         rel="noopener noreferrer"
                         className="text-blue-600 hover:underline dark:text-blue-400 flex items-center gap-1"
                       >
-                        👤 Profile
+                        <User className="h-3.5 w-3.5" /> Profile
                       </a>
                     )}
                   </div>
@@ -131,11 +132,13 @@ export function DocumentList({ documents, onDelete, onReprocess }: DocumentListP
             </div>
             <div className="flex flex-wrap items-center gap-2 shrink-0">
               {document.processing_status === 'completed' && (
-                <Button variant="outline" size="sm" className="text-blue-600 border-blue-300 dark:text-blue-400" onClick={() => onReprocess(document.id)}>
+                <Button variant="outline" size="sm" className="text-blue-600 border-blue-300 dark:text-blue-400 flex items-center gap-1.5" onClick={() => onReprocess(document.id)}>
+                  <RefreshCw className="h-4 w-4" />
                   Reprocess
                 </Button>
               )}
-              <Button variant="outline" size="sm" className="text-red-600 border-red-300 dark:text-red-400" onClick={() => onDelete(document.id)}>
+              <Button variant="outline" size="sm" className="text-red-600 border-red-300 dark:text-red-400 flex items-center gap-1.5" onClick={() => onDelete(document.id)}>
+                <Trash2 className="h-4 w-4" />
                 Delete
               </Button>
             </div>

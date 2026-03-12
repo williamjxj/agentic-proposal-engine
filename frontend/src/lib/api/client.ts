@@ -290,7 +290,27 @@ export async function saveDraft(
     draftRequest
   )
   if (error) {
-    const msg = typeof error === 'string' ? error : JSON.stringify(error)
+    // Handle error properly - ensure it's always a string
+    let msg = 'Failed to save draft'
+    try {
+      if (typeof error === 'string') {
+        msg = error
+      } else if (error && typeof error === 'object') {
+        if ('message' in error && typeof error.message === 'string') {
+          msg = error.message
+        } else if ('toString' in error && typeof error.toString === 'function') {
+          const str = error.toString()
+          msg = typeof str === 'string' ? str : JSON.stringify(error)
+        } else {
+          msg = JSON.stringify(error)
+        }
+      } else if (error != null) {
+        msg = String(error)
+      }
+    } catch (e) {
+      // If anything fails, use the default message
+      msg = 'Failed to save draft: ' + String(error)
+    }
     throw new Error(msg)
   }
   return data
@@ -411,19 +431,34 @@ export async function listKeywords(
 
   const query = params.toString()
   const url = query ? `${backend}/api/keywords?${query}` : `${backend}/api/keywords`
-  const { data } = await apiClient.get<{ keywords: Keyword[] }>(url)
+  const { data, error } = await apiClient.get<{ keywords: Keyword[] }>(url)
+
+  if (error) {
+    throw new Error(error)
+  }
+
   return data?.keywords || []
 }
 
 export async function getKeyword(keywordId: string): Promise<Keyword | null> {
   const backend = getBackendUrl()
-  const { data } = await apiClient.get<Keyword>(`${backend}/api/keywords/${keywordId}`)
+  const { data, error } = await apiClient.get<Keyword>(`${backend}/api/keywords/${keywordId}`)
+
+  if (error) {
+    throw new Error(error)
+  }
+
   return data
 }
 
 export async function createKeyword(data: KeywordCreate): Promise<Keyword | null> {
   const backend = getBackendUrl()
-  const { data: result } = await apiClient.post<Keyword>(`${backend}/api/keywords`, data)
+  const { data: result, error } = await apiClient.post<Keyword>(`${backend}/api/keywords`, data)
+
+  if (error) {
+    throw new Error(error)
+  }
+
   return result
 }
 
@@ -432,23 +467,37 @@ export async function updateKeyword(
   data: KeywordUpdate
 ): Promise<Keyword | null> {
   const backend = getBackendUrl()
-  const { data: result } = await apiClient.patch<Keyword>(
+  const { data: result, error } = await apiClient.patch<Keyword>(
     `${backend}/api/keywords/${keywordId}`,
     data
   )
+
+  if (error) {
+    throw new Error(error)
+  }
+
   return result
 }
 
 export async function deleteKeyword(keywordId: string): Promise<void> {
   const backend = getBackendUrl()
-  await apiClient.delete(`${backend}/api/keywords/${keywordId}`)
+  const { error } = await apiClient.delete(`${backend}/api/keywords/${keywordId}`)
+
+  if (error) {
+    throw new Error(error)
+  }
 }
 
 export async function getKeywordStats(keywordId: string): Promise<KeywordStats | null> {
   const backend = getBackendUrl()
-  const { data } = await apiClient.get<KeywordStats>(
+  const { data, error } = await apiClient.get<KeywordStats>(
     `${backend}/api/keywords/${keywordId}/stats`
   )
+
+  if (error) {
+    throw new Error(error)
+  }
+
   return data
 }
 
@@ -840,6 +889,8 @@ export interface Project {
   status?: string
   test_email?: string
   model_response?: string  // Structured job analysis (Core Responsibilities, Required Skills, etc.)
+  qualification_score?: number  // Match score 0-100 based on keywords/skills
+  qualification_reason?: string  // JSON breakdown of score components
 }
 
 export interface ProjectDiscoverResponse {
@@ -981,6 +1032,38 @@ export async function updateProjectStatus(
   const { data } = await apiClient.put<Project>(
     `${backend}/api/projects/${projectId}/status`,
     { status }
+  )
+  return data
+}
+
+/**
+ * Trigger project scoring for current user
+ */
+export async function triggerProjectScoring(
+  force: boolean = false,
+  limit: number = 100
+): Promise<{ success: boolean; message: string } | null> {
+  const backend = getBackendUrl()
+  const { data } = await apiClient.post<{ success: boolean; message: string }>(
+    `${backend}/api/projects/score/trigger?force=${force}&limit=${limit}`,
+    {}
+  )
+  return data
+}
+
+/**
+ * Get project scoring status
+ */
+export async function getProjectScoringStatus(): Promise<{
+  total_projects: number
+  scored_projects: number
+  unscored_projects: number
+  score_distribution: Record<string, number>
+  recent_scores: Array<{ title: string; score: number; updated_at: string }>
+} | null> {
+  const backend = getBackendUrl()
+  const { data } = await apiClient.get(
+    `${backend}/api/projects/score/status`
   )
   return data
 }

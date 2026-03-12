@@ -61,17 +61,17 @@ async def discover_projects(
 ):
     """
     Discover new projects/jobs from configured data source.
-    
+
     In development mode (USE_HF_DATASET=true), loads jobs from HuggingFace datasets.
     In production mode (USE_HF_DATASET=false), uses web scraping (not yet implemented).
-    
+
     Args:
         request: Discovery request with keywords and filters
         current_user: Current user from JWT token
-    
+
     Returns:
         ProjectDiscoverResponse with discovered jobs
-    
+
     Example:
         POST /api/projects/discover
         {
@@ -142,10 +142,10 @@ async def discover_projects(
             )
 
             logger.info(f"Loaded {len(jobs)} jobs from HuggingFace dataset")
-            
+
             # Ensure id for frontend (use external_id)
             jobs = [{**j, "id": j.get("id") or j.get("external_id")} for j in jobs]
-            
+
             return ProjectDiscoverResponse(
                 success=True,
                 source="huggingface_dataset",
@@ -156,14 +156,14 @@ async def discover_projects(
                 jobs=jobs,
                 keywords_searched=keywords
             )
-        
+
         except Exception as e:
             logger.error(f"Failed to load jobs from HuggingFace: {e}")
             raise HTTPException(
                 status_code=500,
                 detail=f"Failed to discover projects: {str(e)}"
             )
-    
+
     else:
         # Production mode: web scraping (not implemented yet)
         raise HTTPException(
@@ -275,14 +275,14 @@ async def list_projects(
                 limit=fetch_limit,
                 keyword_filter=keywords
             )
-            
+
             # Apply filters
             if platform and platform != "all":
                 jobs = [j for j in jobs if j.get("platform") == platform]
-            
+
             if status and status != "all":
                 jobs = [j for j in jobs if j.get("status") == status]
-            
+
             if category:
                 jobs = [j for j in jobs if category.lower() in (j.get("title") or "").lower()]
 
@@ -297,15 +297,15 @@ async def list_projects(
             else:
                 # Default to date (posted_at)
                 jobs.sort(key=lambda x: x.get("posted_at", ""), reverse=True)
-            
+
             total_matches = len(jobs)
-            
+
             # Pagination
             page_jobs = jobs[offset : offset + limit]
-            
+
             # Ensure id for frontend
             page_jobs = [{**j, "id": j.get("id") or j.get("external_id")} for j in page_jobs]
-            
+
             current_page = (offset // limit) + 1
             total_pages = (total_matches + limit - 1) // limit if limit > 0 else 1
 
@@ -318,11 +318,11 @@ async def list_projects(
                 source="huggingface",
                 dataset_id=HF_DATASET_ID
             )
-        
+
         except Exception as e:
             logger.error(f"Failed to list jobs: {e}")
             raise HTTPException(status_code=500, detail=str(e))
-    
+
     else:
         # TODO: Implement real database query
         return ProjectListResponse(
@@ -345,7 +345,7 @@ async def chat_with_projects(
     Provides insights and matches based on natural language.
     """
     logger.info(f"User {current_user.email} chatting with projects: {query}")
-    
+
     # In HF mode, we'll fetch some sample jobs for context
     if USE_HF_DATASET:
         jobs, _ = fetch_hf_jobs(dataset_id=HF_DATASET_ID, limit=10)
@@ -353,25 +353,25 @@ async def chat_with_projects(
             f"- {j.get('title')} ({j.get('platform')}): {j.get('description')[:100]}..."
             for j in jobs
         ])
-        
+
         prompt = f"""
-        You are an expert freelance assistant. 
+        You are an expert freelance assistant.
         The user is asking: "{query}"
-        
+
         Here are some currently available projects for context:
         {jobs_summary}
-        
-        Provide a helpful, concise response using this context. 
+
+        Provide a helpful, concise response using this context.
         If specific projects match the query, mention them.
         """
-        
+
         try:
             response = await generate_text(prompt)
             return {"response": response}
         except Exception as e:
             logger.error(f"AI service failed: {e}")
             return {"response": "I'm having trouble analyzing the projects right now. Try a manual search!"}
-    
+
     return {"response": "Chat functionality is still being integrated with the database."}
 
 
@@ -379,15 +379,15 @@ async def chat_with_projects(
 async def list_available_datasets():
     """
     Get list of available HuggingFace datasets for job data.
-    
+
     Returns:
         List of dataset information
-    
+
     Example:
         GET /api/projects/datasets
     """
     datasets = get_available_datasets()
-    
+
     return {
         "datasets": datasets,
         "current": HF_DATASET_ID,
@@ -401,13 +401,13 @@ async def get_project_stats(
 ):
     """
     Get statistics about discovered projects.
-    
+
     Args:
         current_user: Current user from JWT token
-    
+
     Returns:
         Project statistics
-    
+
     Example:
         GET /api/projects/stats
     """
@@ -444,7 +444,7 @@ async def get_project_stats(
         except Exception as e:
             logger.error(f"Failed to get stats from database: {e}")
             raise HTTPException(status_code=500, detail=str(e))
-    
+
     if USE_HF_DATASET:
         # Resolve filter keywords from keywords table first (user → system fallback)
         filter_keywords: List[str] = []
@@ -537,14 +537,14 @@ async def get_project(
 ):
     """
     Get details of a specific project.
-    
+
     Args:
         project_id: Project UUID or external ID
         current_user: Current user from JWT token
-    
+
     Returns:
         Project details
-    
+
     Example:
         GET /api/projects/abc123
     """
@@ -570,12 +570,12 @@ async def update_project_status(
 ):
     """
     Update user's job status (FR-005).
-    
+
     Args:
         project_id: Job UUID
         status: new, reviewed, applied, won, lost, archived
         current_user: Current user from JWT token
-    
+
     Returns:
         Updated job with new status
     """
@@ -609,7 +609,7 @@ async def update_project_status(
 async def health_check():
     """
     Health check endpoint for projects service.
-    
+
     Returns:
         Service health status
     """
@@ -619,3 +619,149 @@ async def health_check():
         "mode": "huggingface" if USE_HF_DATASET else "scraper",
         "dataset": HF_DATASET_ID if USE_HF_DATASET else None
     }
+
+
+@router.post("/score/trigger")
+async def trigger_project_scoring(
+    force: bool = Query(False, description="Force recalculation of all scores"),
+    limit: int = Query(100, ge=1, le=500, description="Max projects to score"),
+    current_user: UserResponse = Depends(get_current_user)
+):
+    """
+    Trigger project scoring for current user.
+    Runs in background and returns immediately.
+
+    Args:
+        force: Recalculate all scores, ignore cache
+        limit: Maximum projects to score
+        current_user: Current authenticated user
+
+    Returns:
+        Task status confirmation
+
+    Example:
+        POST /api/projects/score/trigger?force=true&limit=100
+    """
+    from ..tasks.scoring_tasks import score_all_projects_for_user
+    import asyncio
+
+    logger.info(
+        f"User {current_user.email} triggered project scoring "
+        f"(force={force}, limit={limit})"
+    )
+
+    # Queue background task (don't await)
+    asyncio.create_task(
+        score_all_projects_for_user(
+            user_id=str(current_user.id),
+            force_recalculate=force,
+            limit=limit
+        )
+    )
+
+    return {
+        "success": True,
+        "message": "Project scoring started in background",
+        "user_id": str(current_user.id),
+        "force": force,
+        "limit": limit
+    }
+
+
+@router.get("/score/status")
+async def get_scoring_status(
+    current_user: UserResponse = Depends(get_current_user)
+):
+    """
+    Get project scoring status for current user.
+    Shows how many projects have been scored.
+
+    Args:
+        current_user: Current authenticated user
+
+    Returns:
+        Scoring statistics
+
+    Example:
+        GET /api/projects/score/status
+    """
+    from ..core.database import get_db_pool
+
+    pool = await get_db_pool()
+
+    try:
+        # Get total projects
+        total_projects = await pool.fetchval(
+            "SELECT COUNT(*)::int FROM projects"
+        )
+
+        # Get scored projects for user
+        scored_count = await pool.fetchval(
+            """
+            SELECT COUNT(*)::int
+            FROM user_project_qualifications
+            WHERE user_id = $1::uuid
+            """,
+            str(current_user.id)
+        )
+
+        # Get score distribution
+        score_distribution = await pool.fetch(
+            """
+            SELECT
+                CASE
+                    WHEN qualification_score >= 90 THEN 'excellent'
+                    WHEN qualification_score >= 70 THEN 'good'
+                    WHEN qualification_score >= 50 THEN 'fair'
+                    ELSE 'low'
+                END as score_range,
+                COUNT(*)::int as count
+            FROM user_project_qualifications
+            WHERE user_id = $1::uuid
+            GROUP BY score_range
+            ORDER BY
+                CASE score_range
+                    WHEN 'excellent' THEN 1
+                    WHEN 'good' THEN 2
+                    WHEN 'fair' THEN 3
+                    ELSE 4
+                END
+            """,
+            str(current_user.id)
+        )
+
+        distribution = {row['score_range']: row['count'] for row in score_distribution}
+
+        # Get recently scored projects
+        recent = await pool.fetch(
+            """
+            SELECT p.title, upq.qualification_score, upq.updated_at
+            FROM user_project_qualifications upq
+            JOIN projects p ON p.id = upq.project_id
+            WHERE upq.user_id = $1::uuid
+            ORDER BY upq.updated_at DESC
+            LIMIT 5
+            """,
+            str(current_user.id)
+        )
+
+        recent_scores = [
+            {
+                "title": r['title'],
+                "score": float(r['qualification_score']),
+                "updated_at": r['updated_at'].isoformat()
+            }
+            for r in recent
+        ]
+
+        return {
+            "total_projects": total_projects,
+            "scored_projects": scored_count,
+            "unscored_projects": total_projects - scored_count,
+            "score_distribution": distribution,
+            "recent_scores": recent_scores
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get scoring status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

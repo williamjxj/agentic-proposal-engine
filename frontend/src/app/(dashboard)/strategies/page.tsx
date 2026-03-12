@@ -1,6 +1,6 @@
 /**
  * Strategies Page
- * 
+ *
  * Lists user strategies with filters and state preservation.
  * Integrates with session context for seamless navigation.
  */
@@ -8,6 +8,7 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
+import { Plus } from 'lucide-react'
 import { useSessionState } from '@/hooks/useSessionState'
 import { useNavigationTiming } from '@/hooks/useNavigationTiming'
 import { LoadingSkeleton } from '@/components/workflow/progress-overlay'
@@ -146,7 +147,10 @@ export default function StrategiesPage() {
         title="Strategies"
         description="Manage AI prompt templates for proposal generation"
       >
-        <Button onClick={handleCreate}>Create Strategy</Button>
+        <Button onClick={handleCreate} className="flex items-center gap-1.5">
+          <Plus className="h-4 w-4" />
+          Create Strategy
+        </Button>
       </PageHeader>
 
       {/* Error Display */}

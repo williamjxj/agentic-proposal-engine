@@ -60,7 +60,13 @@ async def get_proposal_quality(
     """Get quality score and suggestions for a proposal (T033, FR-009)."""
     quality = await proposal_service.get_proposal_quality(proposal_id, current_user.id)
     if not quality:
-        raise HTTPException(status_code=404, detail="Quality data not available for this proposal")
+        # Return empty quality data instead of 404 for proposals without quality scores
+        return ProposalQuality(
+            overall_score=None,
+            dimension_scores=None,
+            suggestions=None,
+            word_count=None
+        )
     return ProposalQuality(**quality)
 
 
@@ -72,10 +78,10 @@ async def get_proposal(
     """Get a single proposal by ID."""
     user_id = current_user.id
     proposal = await proposal_service.get_proposal(proposal_id, user_id)
-    
+
     if not proposal:
         raise HTTPException(status_code=404, detail="Proposal not found")
-    
+
     return proposal
 
 
@@ -98,7 +104,7 @@ async def generate_proposal_from_job(
 ):
     """
     Generate an AI-powered proposal using RAG and a selected strategy.
-    
+
     This is the core agentic workflow. Returns 429 if another generation is in progress (FR-010).
     """
     try:
@@ -121,10 +127,10 @@ async def submit_from_draft(
     """Convert a draft to a final proposal and delete the draft."""
     user_id = current_user.id
     proposal = await proposal_service.submit_from_draft(user_id, entity_type, entity_id)
-    
+
     if not proposal:
         raise HTTPException(status_code=404, detail="Draft not found")
-    
+
     return proposal
 
 
@@ -137,10 +143,10 @@ async def update_proposal(
     """Update an existing proposal."""
     user_id = current_user.id
     proposal = await proposal_service.update_proposal(proposal_id, user_id, proposal_data)
-    
+
     if not proposal:
         raise HTTPException(status_code=404, detail="Proposal not found")
-    
+
     return proposal
 
 
@@ -152,8 +158,8 @@ async def delete_proposal(
     """Delete a proposal."""
     user_id = current_user.id
     success = await proposal_service.delete_proposal(proposal_id, user_id)
-    
+
     if not success:
         raise HTTPException(status_code=404, detail="Proposal not found")
-    
+
     return None

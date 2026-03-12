@@ -55,26 +55,26 @@ class KeywordService:
                 """
                 params = [user_id]
                 param_count = 1
-                
+
                 if search:
                     param_count += 1
                     query += f" AND (keyword ILIKE ${param_count} OR description ILIKE ${param_count})"
                     params.append(f"%{search}%")
-                
+
                 if is_active is not None:
                     param_count += 1
                     query += f" AND is_active = ${param_count}"
                     params.append(is_active)
-                
+
                 if match_type:
                     param_count += 1
                     query += f" AND match_type = ${param_count}"
                     params.append(match_type)
-                
+
                 query += " ORDER BY created_at DESC"
-                
+
                 rows = await conn.fetch(query, *params)
-                
+
                 keywords = []
                 for row in rows:
                     keywords.append(
@@ -91,7 +91,7 @@ class KeywordService:
                             updated_at=row["updated_at"],
                         )
                     )
-                
+
                 return keywords
         except Exception as e:
             logger.error(f"Error listing keywords for user {user_id}: {e}")
@@ -122,10 +122,10 @@ class KeywordService:
                     keyword_id,
                     user_id
                 )
-                
+
                 if not row:
                     return None
-                
+
                 return Keyword(
                     id=str(row["id"]),
                     user_id=str(row["user_id"]),
@@ -172,12 +172,12 @@ class KeywordService:
                     user_id,
                     keyword_data.keyword
                 )
-                
+
                 if existing:
                     raise AutoBidderError(
                         f"Keyword '{keyword_data.keyword}' already exists for this user"
                     )
-                
+
                 # Insert new keyword
                 row = await conn.fetchrow(
                     """
@@ -191,10 +191,10 @@ class KeywordService:
                     keyword_data.match_type,
                     keyword_data.is_active,
                 )
-                
+
                 if not row:
                     raise AutoBidderError("Failed to create keyword")
-                
+
                 return Keyword(
                     id=str(row["id"]),
                     user_id=str(row["user_id"]),
@@ -235,7 +235,7 @@ class KeywordService:
             existing = await self.get_keyword(keyword_id, user_id)
             if not existing:
                 raise AutoBidderError("Keyword not found")
-            
+
             pool = await get_db_pool()
             async with pool.acquire() as conn:
                 # Check for duplicate if keyword text is being changed
@@ -249,65 +249,64 @@ class KeywordService:
                         keyword_data.keyword,
                         keyword_id
                     )
-                    
+
                     if duplicate:
                         raise AutoBidderError(
                             f"Keyword '{keyword_data.keyword}' already exists for this user"
                         )
-                
+
                 # Build update dict (only include provided fields)
                 update_fields = []
                 params = []
                 param_count = 0
-                
+
                 if keyword_data.keyword is not None:
                     param_count += 1
                     update_fields.append(f"keyword = ${param_count}")
                     params.append(keyword_data.keyword)
-                
+
                 if keyword_data.description is not None:
                     param_count += 1
                     update_fields.append(f"description = ${param_count}")
                     params.append(keyword_data.description)
-                
+
                 if keyword_data.match_type is not None:
                     param_count += 1
                     update_fields.append(f"match_type = ${param_count}")
                     params.append(keyword_data.match_type)
-                
+
                 if keyword_data.is_active is not None:
                     param_count += 1
                     update_fields.append(f"is_active = ${param_count}")
                     params.append(keyword_data.is_active)
-                
+
                 if not update_fields:
                     return existing
-                
-                # Add updated_at
-                param_count += 1
+
+                # Add updated_at (no parameter needed since it uses CURRENT_TIMESTAMP)
                 update_fields.append(f"updated_at = CURRENT_TIMESTAMP")
-                
+
                 # Add WHERE clause params
                 param_count += 1
                 params.append(keyword_id)
                 keyword_id_param = param_count
-                
+
                 param_count += 1
                 params.append(user_id)
                 user_id_param = param_count
-                
+
                 query = f"""
                     UPDATE keywords
                     SET {', '.join(update_fields)}
                     WHERE id = ${keyword_id_param} AND user_id = ${user_id_param}
                     RETURNING *
                 """
-                
+
                 row = await conn.fetchrow(query, *params)
-                
+
                 if not row:
                     raise AutoBidderError("Failed to update keyword")
-                
+
                 return Keyword(
                     id=str(row["id"]),
                     user_id=str(row["user_id"]),
@@ -342,7 +341,7 @@ class KeywordService:
             existing = await self.get_keyword(keyword_id, user_id)
             if not existing:
                 raise AutoBidderError("Keyword not found")
-            
+
             pool = await get_db_pool()
             async with pool.acquire() as conn:
                 # Delete keyword
@@ -354,7 +353,7 @@ class KeywordService:
                     keyword_id,
                     user_id
                 )
-                
+
                 logger.info(f"Deleted keyword {keyword_id} for user {user_id}")
         except AutoBidderError:
             raise

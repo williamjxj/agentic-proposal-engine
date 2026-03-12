@@ -1,12 +1,13 @@
 /**
  * Credential Form Component
- * 
+ *
  * Form for creating and editing platform credentials.
  */
 
 'use client'
 
 import { useState, useEffect } from 'react'
+import { X, Save, Key } from 'lucide-react'
 import { useCredentials, useUpsertCredential } from '@/hooks/useSettings'
 import type { CredentialUpsert, Platform } from '@/types/settings'
 
@@ -96,9 +97,10 @@ export function CredentialForm({ credentialId, onClose, onSuccess }: CredentialF
           </h2>
           <button
             onClick={onClose}
-            className="text-muted-foreground hover:text-foreground"
+            className="text-muted-foreground hover:text-foreground rounded-md p-1 hover:bg-slate-100 dark:hover:bg-slate-800"
+            title="Close"
           >
-            ✕
+            <X className="h-5 w-5" />
           </button>
         </div>
 
@@ -184,8 +186,9 @@ export function CredentialForm({ credentialId, onClose, onSuccess }: CredentialF
             <button
               type="submit"
               disabled={upsertMutation.isPending}
-              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 flex items-center gap-1.5"
             >
+              <Key className="h-4 w-4" />
               {upsertMutation.isPending ? 'Saving...' : isEditing ? 'Update' : 'Create'}
             </button>
           </div>

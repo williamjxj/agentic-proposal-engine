@@ -1,12 +1,13 @@
 /**
  * Keyword Form Component
- * 
+ *
  * Form for creating and editing keywords.
  */
 
 'use client'
 
 import { useState, useEffect } from 'react'
+import { X, Save } from 'lucide-react'
 import { useKeyword, useCreateKeyword, useUpdateKeyword } from '@/hooks/useKeywords'
 import type { KeywordCreate, KeywordUpdate, MatchType } from '@/types/keywords'
 
@@ -70,14 +71,19 @@ export function KeywordForm({ keywordId, onClose, onSuccess }: KeywordFormProps)
           match_type: formData.match_type,
           is_active: formData.is_active,
         }
+        console.log('Updating keyword:', keywordId, updateData)
         await updateMutation.mutateAsync({ id: keywordId, data: updateData })
+        console.log('Keyword updated successfully')
       } else {
+        console.log('Creating keyword:', formData)
         await createMutation.mutateAsync(formData)
+        console.log('Keyword created successfully')
       }
       onSuccess()
     } catch (error: any) {
       console.error('Error saving keyword:', error)
-      setErrors({ submit: error.message || 'Failed to save keyword' })
+      const errorMessage = error?.response?.data?.detail || error?.message || 'Failed to save keyword'
+      setErrors({ submit: errorMessage })
     }
   }
 
@@ -95,10 +101,11 @@ export function KeywordForm({ keywordId, onClose, onSuccess }: KeywordFormProps)
           </h2>
           <button
             onClick={onClose}
-            className="text-muted-foreground hover:text-foreground"
+            className="text-muted-foreground hover:text-foreground rounded-md p-1 hover:bg-slate-100 dark:hover:bg-slate-800"
             aria-label="Close dialog"
+            title="Close"
           >
-            ✕
+            <X className="h-5 w-5" />
           </button>
         </div>
 
@@ -186,8 +193,9 @@ export function KeywordForm({ keywordId, onClose, onSuccess }: KeywordFormProps)
             <button
               type="submit"
               disabled={createMutation.isPending || updateMutation.isPending}
-              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 flex items-center gap-1.5"
             >
+              <Save className="h-4 w-4" />
               {createMutation.isPending || updateMutation.isPending
                 ? 'Saving...'
                 : isEditing

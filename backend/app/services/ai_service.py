@@ -269,7 +269,15 @@ class AIService:
         tone_instr = f"\nTone: {strategy.tone}"
         focus_instr = f"\nFocus Areas: {', '.join(strategy.focus_areas)}" if strategy.focus_areas else ""
 
-        return f"{base_instructions}{citation_instr}{skills_instr}{tone_instr}{focus_instr}\n\n" \
+        # Do NOT include closing signatures - the email system adds professional signature automatically
+        no_signature_instr = (
+            "\n\nIMPORTANT: Do NOT include closing signatures, sign-offs, or contact information "
+            "(such as 'Sincerely', 'Thank you for your consideration', 'Best regards', name, phone, email, etc.). "
+            "End the proposal with your final value proposition or call-to-action. "
+            "The professional signature with contact details will be added automatically by the email system."
+        )
+
+        return f"{base_instructions}{citation_instr}{skills_instr}{tone_instr}{focus_instr}{no_signature_instr}\n\n" \
                f"Response Format: Start with 'Title: [Brief Compelling Title]' followed by the full proposal content."
 
     def _build_user_prompt(

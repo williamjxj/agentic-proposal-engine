@@ -1,6 +1,6 @@
 /**
  * Knowledge Base Page
- * 
+ *
  * Lists user documents with filters and state preservation.
  * Integrates with session context for seamless navigation.
  */
@@ -26,6 +26,7 @@ import { DocumentUpload } from '@/components/knowledge-base/document-upload'
 import { PageHeader } from '@/components/shared/page-header'
 import { PageContainer } from '@/components/shared/page-container'
 import { Button } from '@/components/ui/button'
+import { Upload } from 'lucide-react'
 
 export default function KnowledgeBasePage() {
   const { getFilters, setFilters, getScrollPosition, setScrollPosition } = useSessionState()
@@ -134,7 +135,10 @@ export default function KnowledgeBasePage() {
         title="Knowledge Base"
         description="Upload and manage documents for AI-powered proposal generation"
       >
-        <Button onClick={() => setShowUpload(true)}>Upload Document</Button>
+        <Button onClick={() => setShowUpload(true)} className="flex items-center gap-1.5">
+          <Upload className="h-4 w-4" />
+          Upload Document
+        </Button>
       </PageHeader>
 
       {/* Filters */}

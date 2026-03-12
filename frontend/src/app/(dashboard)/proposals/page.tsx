@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Trash2, Search, Filter, Calendar, DollarSign, Clock, Briefcase, Check, Edit, Award, X } from 'lucide-react'
+import { Trash2, Search, Filter, Calendar, DollarSign, Clock, Briefcase, Check, Edit, Award, X, Plus } from 'lucide-react'
 import { deleteProposal } from '@/lib/api/client'
 import { useToast } from '@/lib/toast/toast-context'
 import { cn } from '@/lib/utils'
@@ -167,7 +167,10 @@ export default function ProposalsPage() {
   return (
     <PageContainer ref={scrollContainerRef} className="space-y-6 pb-20">
       <PageHeader title="Proposals" description="Manage and track your proposal workflow">
-        <Button onClick={handleNewProposal} className="shimmer-button">New Proposal</Button>
+        <Button onClick={handleNewProposal} className="shimmer-button flex items-center gap-1.5">
+          <Plus className="h-4 w-4" />
+          New Proposal
+        </Button>
       </PageHeader>
 
       {/* Tabs with premium styling */}

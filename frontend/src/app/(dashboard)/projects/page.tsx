@@ -10,6 +10,8 @@
 import { useEffect, useRef, useState, useCallback, memo } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { useSessionState } from '@/hooks/useSessionState'
 import {
   useProjects,
@@ -31,7 +33,7 @@ import { Input } from '@/components/ui/input'
 import { EmptyState } from '@/components/shared/empty-state'
 import { useReduceMotion } from '@/hooks/useReduceMotion'
 import { cn } from '@/lib/utils'
-import { Search, Sparkles, FilePlus } from 'lucide-react'
+import { Search, Sparkles, FilePlus, X, Upload, Loader2 } from 'lucide-react'
 
 interface PageProjectFilters {
   search: string
@@ -335,11 +337,12 @@ function StatsCard({
           {value}
         </span>
         {tip && (
-          <span
-            className="cursor-help text-muted-foreground/40 hover:text-primary ml-0.5 shrink-0"
-            title={tip}
-          >
+          <span className="relative cursor-help text-muted-foreground/40 hover:text-primary ml-0.5 shrink-0">
             ⓘ
+            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 invisible group-hover:visible w-56 p-2.5 bg-slate-900 text-white text-[11px] leading-relaxed rounded-lg shadow-xl z-50 text-center backdrop-blur-sm bg-opacity-95 border border-slate-700 pointer-events-none whitespace-normal">
+              {tip}
+              <span className="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent border-t-slate-900" />
+            </span>
           </span>
         )}
       </div>
@@ -538,6 +541,29 @@ function ProjectCard({
                   Applied
                 </Badge>
               )}
+              {/* Match Score Badge */}
+              {project.qualification_score !== undefined && project.qualification_score !== null && (
+                <Badge
+                  variant={
+                    project.qualification_score >= 90 ? 'default' :
+                    project.qualification_score >= 70 ? 'secondary' :
+                    'outline'
+                  }
+                  className={cn(
+                    'shrink-0 font-semibold',
+                    project.qualification_score >= 90 && 'bg-green-600 hover:bg-green-700 text-white',
+                    project.qualification_score >= 70 && project.qualification_score < 90 && 'bg-blue-600 hover:bg-blue-700 text-white',
+                    project.qualification_score >= 50 && project.qualification_score < 70 && 'border-yellow-500 text-yellow-700 dark:text-yellow-400',
+                    project.qualification_score < 50 && 'border-gray-400 text-gray-600 dark:text-gray-400'
+                  )}
+                  title={`Match score based on your keywords and skills`}
+                >
+                  {project.qualification_score >= 90 && '⭐⭐⭐ '}
+                  {project.qualification_score >= 70 && project.qualification_score < 90 && '⭐⭐ '}
+                  {project.qualification_score >= 50 && project.qualification_score < 70 && '⭐ '}
+                  {Math.round(project.qualification_score)}% Match
+                </Badge>
+              )}
               <Badge variant="secondary" className="uppercase shrink-0">
                 {project.platform}
               </Badge>
@@ -566,13 +592,40 @@ function ProjectCard({
           )}
         </div>
       </CardHeader>
-      <CardContent className="cursor-pointer pt-0" onClick={() => setExpanded(!expanded)}>
-        <p className={`text-sm text-muted-foreground leading-relaxed ${expanded ? '' : 'line-clamp-3'}`}>
-          <HighlightText text={project.description} highlight={highlight} />
-        </p>
-        <p className="text-xs text-primary mt-1 font-medium">
-          {expanded ? '▲ Show less' : '▼ View Details'}
-        </p>
+      <CardContent className="pt-0">
+        {expanded ? (
+          <div className="space-y-4">
+            <div className="prose prose-sm dark:prose-invert max-w-none">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {project.description}
+              </ReactMarkdown>
+            </div>
+            {(project as any).model_response && (
+              <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                <div className="prose prose-sm dark:prose-invert max-w-none">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {(project as any).model_response}
+                  </ReactMarkdown>
+                </div>
+              </div>
+            )}
+            <button
+              onClick={() => setExpanded(false)}
+              className="text-xs text-primary mt-2 font-medium hover:underline"
+            >
+              ▲ Show less
+            </button>
+          </div>
+        ) : (
+          <div className="cursor-pointer" onClick={() => setExpanded(true)}>
+            <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3">
+              <HighlightText text={project.description} highlight={highlight} />
+            </p>
+            <p className="text-xs text-primary mt-1 font-medium">
+              ▼ View Details
+            </p>
+          </div>
+        )}
       </CardContent>
       {expanded && project.skills?.length > 0 && (
         <CardContent className="pt-0">
@@ -637,8 +690,8 @@ function DiscoverDialog({
       <div className="bg-white dark:bg-slate-900 rounded-lg p-4 sm:p-6 max-w-md w-full max-h-[90vh] overflow-y-auto my-auto border border-slate-200 dark:border-slate-800 shadow-xl">
         <div className="flex items-start justify-between mb-4">
           <h2 className="text-lg sm:text-xl font-bold">Discover Jobs</h2>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1 -mr-1" aria-label="Close">
-            ✕
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1 -mr-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Close" title="Close">
+            <X className="h-5 w-5" />
           </button>
         </div>
         <div className="space-y-4">
@@ -672,14 +725,24 @@ function DiscoverDialog({
           <button
             onClick={onDiscover}
             disabled={isDiscovering}
-            className="flex-1 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 min-h-[44px] sm:min-h-0"
+            className="flex-1 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 min-h-[44px] sm:min-h-0 flex items-center justify-center gap-1.5"
           >
-            {isDiscovering ? 'Discovering...' : 'Discover'}
+            {isDiscovering ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Discovering...
+              </>
+            ) : (
+              <>
+                <Search className="h-4 w-4" />
+                Discover
+              </>
+            )}
           </button>
           <button
             onClick={onClose}
             disabled={isDiscovering}
-            className="flex-1 rounded-md bg-slate-200 px-4 py-2.5 text-sm font-medium hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-50 min-h-[44px] sm:min-h-0"
+            className="flex-1 rounded-md bg-slate-200 px-4 py-2.5 text-sm font-medium hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-50 min-h-[44px] sm:min-h-0 flex items-center justify-center gap-1.5"
           >
             Cancel
           </button>
@@ -718,8 +781,8 @@ function ManualUploadDialog({
       <div className="bg-white dark:bg-slate-900 rounded-lg p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto my-auto border border-slate-200 dark:border-slate-800 shadow-xl">
         <div className="flex items-start justify-between mb-4">
           <h2 className="text-xl font-bold">Manual Project Upload</h2>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1" aria-label="Close">
-            ✕
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Close" title="Close">
+            <X className="h-5 w-5" />
           </button>
         </div>
 
@@ -807,7 +870,7 @@ function ManualUploadDialog({
 
         <div className="flex gap-3 mt-8">
           <Button
-            className="flex-1"
+            className="flex-1 flex items-center justify-center gap-1.5"
             onClick={() => onSubmit({
               ...formData,
               skills: formData.skills.split(',').map(s => s.trim()).filter(Boolean),
@@ -816,7 +879,17 @@ function ManualUploadDialog({
             })}
             disabled={isSubmitting || !formData.title || !formData.description}
           >
-            {isSubmitting ? 'Uploading...' : 'Upload Project'}
+            {isSubmitting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Uploading...
+              </>
+            ) : (
+              <>
+                <Upload className="h-4 w-4" />
+                Upload Project
+              </>
+            )}
           </Button>
           <Button variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
         </div>

@@ -1,12 +1,13 @@
 /**
  * Preferences Form Component
- * 
+ *
  * Form for updating user preferences.
  */
 
 'use client'
 
 import { useState, useEffect } from 'react'
+import { Save } from 'lucide-react'
 import { useSettings, useUpdatePreferences } from '@/hooks/useSettings'
 import type { UserPreferences } from '@/types/settings'
 
@@ -113,8 +114,9 @@ export function PreferencesForm() {
         <button
           type="submit"
           disabled={updateMutation.isPending}
-          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 flex items-center gap-1.5"
         >
+          <Save className="h-4 w-4" />
           {updateMutation.isPending ? 'Saving...' : 'Save Preferences'}
         </button>
       </div>
