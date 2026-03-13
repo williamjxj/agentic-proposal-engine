@@ -14,6 +14,10 @@ An AI-powered auto-bidding platform that reduces proposal writing time from 30 m
 ![Projects](./assets/images/projects.png)
 *Browse and track jobs you're bidding on*
 
+### <span style="color:#b45309; font-weight:800;">Generate Proposal (Elite Feature)</span>
+![Generate Proposal](./assets/images/generate-proposal.png)
+*<span style="color:#92400e; font-weight:700;">The signature feature of Auto-Bidder:</span> <span style="font-weight:600;">AI fuses each project's requirements with your portfolio, experience, and strengths to craft the best-matched proposal for every client in about 1 minute, then auto-organizes it for customer email delivery and moves the project to Bidding Stage 1 to kick off the bidding process instantly.</span>*
+
 ### Proposals
 ![Proposals](./assets/images/proposals.png)
 *AI-powered proposal generation with RAG, structured job context, and one-click email delivery*
