@@ -26,7 +26,13 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { Loader2, Send, Save, X } from 'lucide-react'
-import { generateProposalFromJob, getProject, listStrategies, listKeywords } from '@/lib/api/client'
+import {
+  getProject,
+  listStrategies,
+  listKeywords,
+  streamProposalFromJob,
+  type ProposalStreamEvent,
+} from '@/lib/api/client'
 import { useToast } from '@/lib/toast/toast-context'
 
 interface ProposalFormData {
@@ -408,7 +414,15 @@ function NewProposalPageContent() {
     setAiError(null)
 
     try {
-      const generated = await generateProposalFromJob({
+      setFormData((prev) => ({
+        ...prev,
+        description: '',
+      }))
+
+      let streamError: string | null = null
+
+      await streamProposalFromJob(
+        {
         job_id: jobContext.id,
         job_title: jobContext.title,
         job_description: jobContext.description,
@@ -420,17 +434,36 @@ function NewProposalPageContent() {
           selectedCollections && selectedCollections !== 'all'
             ? [selectedCollections]
             : undefined,
-      })
+        },
+        (event: ProposalStreamEvent) => {
+          if (event.type === 'token') {
+            setFormData((prev) => ({
+              ...prev,
+              description: `${prev.description}${event.token}`,
+            }))
+            return
+          }
 
-      if (generated) {
-        setFormData((prev) => ({
-          ...prev,
-          title: generated.title,
-          description: generated.description,
-          budget: generated.budget || prev.budget,
-          timeline: generated.timeline || prev.timeline,
-          skills: generated.skills?.join(', ') || prev.skills,
-        }))
+          if (event.type === 'done' && event.result) {
+            setFormData((prev) => ({
+              ...prev,
+              title: event.result?.title || prev.title,
+              description: event.result?.description || prev.description,
+              budget: event.result?.budget || prev.budget,
+              timeline: event.result?.timeline || prev.timeline,
+              skills: event.result?.skills?.join(', ') || prev.skills,
+            }))
+            return
+          }
+
+          if (event.type === 'error') {
+            streamError = event.error || 'Failed to generate proposal'
+          }
+        }
+      )
+
+      if (streamError) {
+        throw new Error(streamError)
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to generate proposal'
@@ -737,7 +770,12 @@ function NewProposalPageContent() {
 
         {/* Description */}
         <div>
-          <Label htmlFor="description">Description *</Label>
+          <Label htmlFor="description" className="flex items-center gap-2">
+            <span>Description *</span>
+            {isAIGenerating && (
+              <span className="text-xs text-primary animate-pulse">AI is writing |</span>
+            )}
+          </Label>
           <Textarea
             id="description"
             value={formData.description}

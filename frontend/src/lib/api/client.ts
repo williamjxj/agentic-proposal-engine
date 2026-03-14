@@ -804,6 +804,12 @@ export interface GeneratedProposal {
   strategy_id?: string
 }
 
+export type ProposalStreamEvent =
+  | { type: 'meta'; model?: string; strategy_id?: string }
+  | { type: 'token'; token: string }
+  | { type: 'done'; result?: GeneratedProposal }
+  | { type: 'error'; error: string }
+
 export async function generateProposalFromJob(
   request: ProposalGenerateRequest
 ): Promise<GeneratedProposal | null> {
@@ -814,6 +820,67 @@ export async function generateProposalFromJob(
   )
   if (error) throw new Error(error)
   return data
+}
+
+export async function streamProposalFromJob(
+  request: ProposalGenerateRequest,
+  onEvent: (event: ProposalStreamEvent) => void
+): Promise<void> {
+  const backend = getBackendUrl()
+  const token =
+    typeof window !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null
+
+  const response = await fetch(`${backend}/api/proposals/generate-from-job/stream`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(request),
+  })
+
+  if (!response.ok) {
+    let message = `Request failed with status ${response.status}`
+    try {
+      const errorBody = await response.json()
+      message = errorBody.detail || errorBody.error || message
+    } catch {
+      // Keep fallback message when response is not JSON.
+    }
+    throw new Error(message)
+  }
+
+  if (!response.body) {
+    throw new Error('Streaming response body is missing.')
+  }
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+
+    buffer += decoder.decode(value, { stream: true })
+    const events = buffer.split('\n\n')
+    buffer = events.pop() || ''
+
+    for (const eventChunk of events) {
+      const dataLine = eventChunk
+        .split('\n')
+        .find((line) => line.startsWith('data: '))
+      if (!dataLine) continue
+
+      const payload = dataLine.slice(6)
+      try {
+        const parsed = JSON.parse(payload) as ProposalStreamEvent
+        onEvent(parsed)
+      } catch {
+        // Ignore malformed chunks and continue stream processing.
+      }
+    }
+  }
 }
 
 // ============================================================================

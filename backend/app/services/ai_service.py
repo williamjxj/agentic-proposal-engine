@@ -7,7 +7,7 @@ This service orchestrates the AI proposal generation process:
 3. Proposal Generation - Calls LLM (OpenAI or DeepSeek) to write the proposal.
 """
 
-from typing import List, Optional, Dict, Any, Tuple
+from typing import List, Optional, Dict, Any, Tuple, AsyncIterator
 import logging
 import json
 import asyncio
@@ -95,6 +95,80 @@ class AIService:
             finally:
                 pass  # Lock released on context exit
 
+    async def generate_proposal_stream(
+        self,
+        user_id: UUID,
+        request: ProposalGenerateRequest,
+    ) -> AsyncIterator[Dict[str, Any]]:
+        """Stream proposal generation events for SSE clients."""
+        if not self.chat_model:
+            raise AutoBidderError("LLM provider not configured. Please set API keys in .env")
+
+        user_key = str(user_id)
+        async with self._locks_lock:
+            if user_key not in self._user_locks:
+                self._user_locks[user_key] = asyncio.Lock()
+            user_lock = self._user_locks[user_key]
+
+        if user_lock.locked():
+            raise RateLimitError(
+                "Another proposal is being generated. Please wait.",
+                details={"retry_after_seconds": 30},
+            )
+
+        async with user_lock:
+            strategy = await self._get_relevant_strategy(user_id, request.strategy_id)
+            context_data = await self._retrieve_rag_context(user_id, request)
+
+            user_keywords: List[str] = []
+            try:
+                kw_list = await keyword_service.list_keywords(
+                    str(user_id), is_active=True
+                )
+                user_keywords = [k.keyword for k in kw_list] if kw_list else []
+            except Exception as ke:
+                logger.debug("Could not load user keywords: %s", ke)
+
+            system_prompt = self._build_system_prompt(strategy)
+            user_prompt = self._build_user_prompt(request, context_data, user_keywords)
+
+            messages = [
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=user_prompt),
+            ]
+
+            model_name = (
+                settings.openai_completion_model
+                if self.llm_provider == "openai"
+                else settings.deepseek_model
+            )
+
+            yield {
+                "type": "meta",
+                "model": model_name,
+                "strategy_id": str(strategy.id),
+            }
+
+            chunks: List[str] = []
+            async for chunk in self.chat_model.astream(messages):
+                token = self._extract_chunk_text(chunk)
+                if token:
+                    chunks.append(token)
+                    yield {"type": "token", "token": token}
+
+            llm_result = "".join(chunks)
+            title, description = self._parse_proposal_output(request, llm_result)
+
+            yield {
+                "type": "done",
+                "result": {
+                    "title": title,
+                    "description": description,
+                    "ai_model": model_name,
+                    "strategy_id": str(strategy.id),
+                },
+            }
+
     async def _generate_proposal_impl(
         self, user_id: UUID, request: ProposalGenerateRequest
     ) -> GeneratedProposal:
@@ -154,15 +228,7 @@ class AIService:
                     llm_result += "\n\n[Based on my portfolio and relevant experience.]"
 
             # Simple parsing of title if AI followed a format like "Title: ... \n\n Content: ..."
-            title = f"AI Proposal for: {request.job_title}"
-            content = llm_result.strip()
-
-            if "Title:" in llm_result[:50]:
-                parts = llm_result.split("\n\n", 1)
-                title_part = parts[0].replace("Title:", "").strip()
-                if title_part:
-                    title = title_part
-                    content = parts[1].strip() if len(parts) > 1 else content
+            title, content = self._parse_proposal_output(request, llm_result)
 
             return GeneratedProposal(
                 title=title,
@@ -304,6 +370,41 @@ class AIService:
             extra += f"\nCUSTOM INSTRUCTIONS: {request.custom_instructions}\n"
 
         return f"{job_info}{context_str}{extra}\n\nPlease write a tailored, professional, and winning proposal for this job."
+
+    @staticmethod
+    def _extract_chunk_text(chunk: Any) -> str:
+        """Extract text content from a streamed LangChain chunk."""
+        content = getattr(chunk, "content", None)
+        if content is None:
+            return ""
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            parts: List[str] = []
+            for part in content:
+                if isinstance(part, dict) and part.get("type") == "text":
+                    text_value = part.get("text")
+                    if isinstance(text_value, str):
+                        parts.append(text_value)
+                elif isinstance(part, str):
+                    parts.append(part)
+            return "".join(parts)
+        return ""
+
+    @staticmethod
+    def _parse_proposal_output(request: ProposalGenerateRequest, llm_result: str) -> Tuple[str, str]:
+        """Parse LLM output into title and description text."""
+        title = f"AI Proposal for: {request.job_title}"
+        content = llm_result.strip()
+
+        if "Title:" in llm_result[:50]:
+            parts = llm_result.split("\n\n", 1)
+            title_part = parts[0].replace("Title:", "").strip()
+            if title_part:
+                title = title_part
+                content = parts[1].strip() if len(parts) > 1 else content
+
+        return title, content
 
 
 # Singleton instance

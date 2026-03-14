@@ -1,8 +1,10 @@
 """API router for proposals."""
+import json
 from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi.responses import StreamingResponse
 
 from app.core.errors import RateLimitError
 from app.models.proposal import (
@@ -97,6 +99,48 @@ async def generate_proposal_from_job(
             retry_after = e.details.get("retry_after_seconds", 30)
         response.headers["Retry-After"] = str(retry_after)
         raise HTTPException(status_code=429, detail=e.message)
+
+
+@router.post("/generate-from-job/stream")
+async def generate_proposal_from_job_stream(
+    request: ProposalGenerateRequest,
+    response: Response,
+    current_user: UserResponse = Depends(get_current_user),
+):
+    """Stream AI-generated proposal text as SSE events."""
+    user_id = current_user.id
+
+    try:
+        stream_iter = ai_service.generate_proposal_stream(user_id, request)
+        first_event = await anext(stream_iter)
+    except RateLimitError as e:
+        retry_after = 30
+        if e.details and isinstance(e.details, dict):
+            retry_after = e.details.get("retry_after_seconds", 30)
+        response.headers["Retry-After"] = str(retry_after)
+        raise HTTPException(status_code=429, detail=e.message)
+
+    async def event_stream():
+        yield f"data: {json.dumps(first_event, ensure_ascii=True)}\n\n"
+        try:
+            async for event in stream_iter:
+                yield f"data: {json.dumps(event, ensure_ascii=True)}\n\n"
+        except Exception:
+            error_payload = {
+                "type": "error",
+                "error": "AI generation failed while streaming.",
+            }
+            yield f"data: {json.dumps(error_payload, ensure_ascii=True)}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.post("/from-draft/{entity_type}/{entity_id}", response_model=Proposal, status_code=201)
