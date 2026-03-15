@@ -1,6 +1,6 @@
 /**
  * useDraftRecovery Hook
- * 
+ *
  * Checks for and offers recovery of drafts on page load.
  * Shows recovery banner if draft is found.
  */
@@ -17,6 +17,7 @@ export interface UseDraftRecoveryOptions {
   onRecover?: (draft: DraftWork) => void
   onDiscard?: () => void
   autoCheck?: boolean
+  skipApiWhenCacheEmpty?: boolean
 }
 
 export interface UseDraftRecoveryReturn {
@@ -39,6 +40,7 @@ export function useDraftRecovery(options: UseDraftRecoveryOptions): UseDraftReco
     onRecover,
     onDiscard,
     autoCheck = true,
+    skipApiWhenCacheEmpty = false,
   } = options
 
   const [draft, setDraft] = useState<DraftWork | null>(null)
@@ -58,7 +60,7 @@ export function useDraftRecovery(options: UseDraftRecoveryOptions): UseDraftReco
         entityType,
         entityId,
         useCache: true,
-        skipApiWhenCacheEmpty: true, // Only call API when cache suggests a draft exists; avoid unnecessary calls on first visit
+        skipApiWhenCacheEmpty,
       })
 
       if (existingDraft && existingDraft.draftData) {
@@ -70,7 +72,7 @@ export function useDraftRecovery(options: UseDraftRecoveryOptions): UseDraftReco
     } finally {
       setIsChecking(false)
     }
-  }, [entityType, entityId, autoCheck])
+  }, [entityType, entityId, autoCheck, skipApiWhenCacheEmpty])
 
   /**
    * Recover draft data

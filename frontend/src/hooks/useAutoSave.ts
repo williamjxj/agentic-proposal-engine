@@ -15,6 +15,7 @@ export interface UseAutoSaveOptions {
   entityType: string
   entityId: string | null
   data: Record<string, any>
+  initialVersion?: number
   enabled?: boolean
   onSaveSuccess?: (draft: DraftWork) => void
   onSaveError?: (error: any) => void
@@ -41,6 +42,7 @@ export function useAutoSave(options: UseAutoSaveOptions): UseAutoSaveReturn {
     entityType,
     entityId,
     data,
+    initialVersion = 1,
     enabled = true,
     onSaveSuccess,
     onSaveError,
@@ -51,7 +53,9 @@ export function useAutoSave(options: UseAutoSaveOptions): UseAutoSaveReturn {
   const [status, setStatus] = useState<SaveStatus>('idle')
   const [lastSaved, setLastSaved] = useState<Date | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [currentVersion, setCurrentVersion] = useState<number>(1)
+  const [currentVersion, setCurrentVersion] = useState<number>(
+    Number.isFinite(initialVersion) && initialVersion > 0 ? initialVersion : 1
+  )
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
 
   const debounceTimerRef = useRef<NodeJS.Timeout>()
@@ -64,6 +68,14 @@ export function useAutoSave(options: UseAutoSaveOptions): UseAutoSaveReturn {
   const FAILURE_BACKOFF_MS = 15000 // Don't retry for 15s after a failure
 
   dataRef.current = data
+
+  useEffect(() => {
+    if (!Number.isFinite(initialVersion) || initialVersion <= 0) {
+      return
+    }
+
+    setCurrentVersion((prev) => (initialVersion > prev ? initialVersion : prev))
+  }, [initialVersion])
 
   /**
    * Perform save operation

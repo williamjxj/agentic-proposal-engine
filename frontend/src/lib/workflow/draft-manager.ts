@@ -1,6 +1,6 @@
 /**
  * Draft Manager
- * 
+ *
  * Client-side draft management with API integration.
  * Handles saving, retrieving, and deleting drafts with conflict detection.
  */
@@ -25,7 +25,46 @@ export interface DraftGetOptions {
   skipApiWhenCacheEmpty?: boolean
 }
 
+type DraftWorkApiResponse = Partial<DraftWork> & {
+  user_id?: string
+  entity_type?: string
+  entity_id?: string | null
+  draft_data?: Record<string, any>
+  draft_version?: number
+  auto_save_count?: number
+  last_auto_save_at?: string | null
+  is_recovered?: boolean
+  recovered_at?: string | null
+  expires_at?: string
+  created_at?: string
+  updated_at?: string
+  version?: number
+  last_saved_at?: string | null
+}
+
 export class DraftManager {
+  private normalizeDraftWork(raw: DraftWorkApiResponse | null): DraftWork | null {
+    if (!raw) {
+      return null
+    }
+
+    return {
+      id: String(raw.id || ''),
+      userId: String(raw.userId || raw.user_id || ''),
+      entityType: ((raw.entityType || raw.entity_type || 'proposal') as DraftWork['entityType']),
+      entityId: (raw.entityId ?? raw.entity_id ?? null) as string | null,
+      draftData: (raw.draftData || raw.draft_data || {}) as Record<string, any>,
+      draftVersion: Number(raw.draftVersion ?? raw.draft_version ?? raw.version ?? 1),
+      autoSaveCount: Number(raw.autoSaveCount ?? raw.auto_save_count ?? 0),
+      lastAutoSaveAt: (raw.lastAutoSaveAt ?? raw.last_auto_save_at ?? raw.lastSavedAt ?? raw.last_saved_at ?? null) as string | null,
+      isRecovered: Boolean(raw.isRecovered ?? raw.is_recovered ?? false),
+      recoveredAt: (raw.recoveredAt ?? raw.recovered_at ?? null) as string | null,
+      expiresAt: String(raw.expiresAt || raw.expires_at || new Date().toISOString()),
+      createdAt: String(raw.createdAt || raw.created_at || new Date().toISOString()),
+      updatedAt: String(raw.updatedAt || raw.updated_at || new Date().toISOString()),
+    }
+  }
+
   /**
    * Save draft to server with optional local caching
    */
@@ -45,12 +84,14 @@ export class DraftManager {
         version,
       })
 
-      return result
+      return this.normalizeDraftWork(result as DraftWorkApiResponse)
     } catch (error: any) {
       console.error('Error saving draft:', error)
 
       // Check if it's a conflict error (409)
-      if (error?.status === 409 || error?.response?.status === 409) {
+      const status = error?.status || error?.response?.status
+      const message = String(error?.message || error || '').toLowerCase()
+      if (status === 409 || message.includes('conflict')) {
         // Re-throw conflict errors so they can be handled by the UI
         throw {
           type: 'conflict',
@@ -102,7 +143,9 @@ export class DraftManager {
 
       // Fetch from server (only when cache missed and we didn't skip)
       const entityIdParam = entityId || 'new'
-      const result = await apiGetDraft(entityType, entityIdParam)
+      const result = this.normalizeDraftWork(
+        (await apiGetDraft(entityType, entityIdParam)) as DraftWorkApiResponse
+      )
 
       // Update cache with server data
       if (result && useCache) {
@@ -112,7 +155,7 @@ export class DraftManager {
       return result
     } catch (error) {
       console.error('Error getting draft:', error)
-      
+
       // If server fetch fails, try cache as fallback
       if (useCache) {
         const cached = await DraftCache.get(entityType, entityId)
@@ -162,7 +205,10 @@ export class DraftManager {
    */
   async listDrafts(): Promise<DraftWork[]> {
     try {
-      return await apiListDrafts()
+      const result = await apiListDrafts()
+      return (result || [])
+        .map((item) => this.normalizeDraftWork(item as DraftWorkApiResponse))
+        .filter((item): item is DraftWork => item !== null)
     } catch (error) {
       console.error('Error listing drafts:', error)
       return []

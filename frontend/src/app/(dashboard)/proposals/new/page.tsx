@@ -253,6 +253,7 @@ function NewProposalPageContent() {
   } = useDraftRecovery({
     entityType: 'proposal',
     entityId: draftId,
+    skipApiWhenCacheEmpty: false,
     onRecover: (recoveredDraft) => {
       // Restore form data from draft
       const draftData = recoveredDraft.draftData
@@ -304,6 +305,7 @@ function NewProposalPageContent() {
   } = useAutoSave({
     entityType: 'proposal',
     entityId: draftId,
+    initialVersion: draft?.draftVersion,
     data: useMemo(
       () => ({
         ...formData,
@@ -374,6 +376,29 @@ function NewProposalPageContent() {
       ...prev,
       [field]: value,
     }))
+  }
+
+  const withProjectTitleAnchor = (candidateTitle: string, currentTitle: string) => {
+    const trimmedCandidate = (candidateTitle || '').trim()
+    const fallbackTitle = (currentTitle || '').trim()
+    const baseTitle = trimmedCandidate || fallbackTitle
+
+    if (!baseTitle) {
+      return currentTitle
+    }
+
+    if (!jobContext?.title) {
+      return baseTitle
+    }
+
+    const normalizedBase = baseTitle.toLowerCase()
+    const normalizedProject = jobContext.title.toLowerCase()
+
+    if (normalizedBase.includes(normalizedProject)) {
+      return baseTitle
+    }
+
+    return `${jobContext.title} | ${baseTitle}`
   }
 
   // Handle form submission
@@ -480,7 +505,7 @@ function NewProposalPageContent() {
             if (event.type === 'done' && event.result) {
               setFormData((prev) => ({
                 ...prev,
-                title: event.result?.title || prev.title,
+                title: withProjectTitleAnchor(event.result?.title || '', prev.title),
                 description: event.result?.description || prev.description,
                 budget: event.result?.budget || prev.budget,
                 timeline: event.result?.timeline || prev.timeline,
@@ -503,7 +528,7 @@ function NewProposalPageContent() {
         if (generated) {
           setFormData((prev) => ({
             ...prev,
-            title: generated.title,
+            title: withProjectTitleAnchor(generated.title || '', prev.title),
             description: generated.description,
             budget: generated.budget || prev.budget,
             timeline: generated.timeline || prev.timeline,
@@ -812,6 +837,11 @@ function NewProposalPageContent() {
             placeholder="Enter a compelling title for your proposal"
             className="mt-2"
           />
+          {jobContext && (
+            <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+              Linked project: <span className="font-medium">{jobContext.title}</span> ({jobContext.platform} • {jobContext.id})
+            </p>
+          )}
         </div>
 
         {/* Description */}
