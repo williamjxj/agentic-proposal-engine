@@ -59,11 +59,12 @@
    - ✅ API Client ([client.ts](../frontend/src/lib/api/client.ts))
    - ✅ Projects Dashboard UI ([page.tsx](../frontend/src/app/(dashboard)/projects/page.tsx))
    - ✅ Job discovery dialog with keyword search
-   - ✅ Project cards with skills, budget, location
-   - ✅ Statistics dashboard (total jobs, platforms, skills)
+   - ✅ Dataset dropdown with Info tooltip (dataset name, ID, HuggingFace link on hover)
+   - ✅ Project cards with skills, budget, location, source badge (dataset name or Manual/Freelancer)
    - ✅ Search and filter functionality
    - ✅ Session state management
    - ✅ "Generate Proposal" integration
+   - ℹ️ Stats API (`GET /api/projects/stats`) available; Projects UI does not display stats cards
 
 6. **Testing**
    - ✅ Comprehensive test suite (test_hf_integration.py)
@@ -235,6 +236,7 @@ Response:
       "skills": ["Python", "FastAPI", "PostgreSQL"],
       "budget": "5000-8000",
       "platform": "huggingface_dataset",
+      "source": "lukebarousse/data_jobs",
       "status": "new"
     }
   ],
@@ -298,11 +300,8 @@ Response:
 # HuggingFace Dataset Configuration (Mock data for development)
 USE_HF_DATASET=true
 HF_DATASET_ID=jacob-hugging-face/job-descriptions
+HF_DATASET_IDS=jacob-hugging-face/job-descriptions,lukebarousse/data_jobs,datastax/linkedin_job_listings
 HF_JOB_LIMIT=200
-
-# Alternative datasets (uncomment to use):
-# HF_DATASET_ID=lukebarousse/data_jobs
-# HF_DATASET_ID=debasmitamukherjee/IT_job_postings
 ```
 
 ### Configuration Files Modified
@@ -338,14 +337,14 @@ HF_JOB_LIMIT=200
    - Go to **Projects** page
 
 3. **Discover Jobs**
-   - Click "Discover Jobs" button
+   - Click "Discover" button
    - Enter keywords: `python, fastapi, backend`
-   - Optionally select a dataset
+   - Optionally select a dataset from the dropdown (hover ⓘ for dataset resource details)
    - Click "Discover"
 
 4. **Browse Results**
    - Scroll through job cards
-   - View skills, budget, location, platform
+   - View skills, budget, location, source (dataset name or Manual/Freelancer)
    - Click job card for details
 
 5. **Generate Proposals**
@@ -642,11 +641,9 @@ ds = load_dataset("dataset-name", split="train", streaming=True)
 print(next(iter(ds)))  # Print first record to see fields
 ```
 
-### TypeError in Stats Rendering
+### Stats API vs UI
 
-**Error:** `Cannot convert undefined or null to object`
-
-**Solution:** Frontend has null-safe rendering. Clear browser cache and refresh.
+**Note:** The Projects page does not display stats cards (Total Data, Total Opportunities, etc.). The `GET /api/projects/stats` endpoint remains available for dashboards or future use.
 
 ---
 
@@ -711,7 +708,7 @@ print(next(iter(ds)))  # Print first record to see fields
 
 **Modified:**
 - `frontend/src/lib/api/client.ts` (added projects API functions)
-- `frontend/src/app/(dashboard)/projects/page.tsx` (complete rewrite with discovery, stats, filtering)
+- `frontend/src/app/(dashboard)/projects/page.tsx` (complete rewrite with discovery, filtering, dataset tooltip, source badges)
 
 ### Documentation
 
@@ -736,13 +733,14 @@ The HuggingFace integration is **fully implemented and production-ready**. The s
 
 ✅ Discover jobs from public datasets  
 ✅ Filter by keywords and criteria  
-✅ Display in beautiful UI  
-✅ Support multiple datasets  
+✅ Display in beautiful UI with dataset resource tooltips  
+✅ Support multiple datasets (HF_DATASET_IDS)  
 ✅ Handle large datasets efficiently  
 ✅ Generate proposals from discovered jobs  
-✅ Provide statistics and insights  
+✅ Source badges show dataset name (e.g. Data Jobs (2023)) or Manual/Freelancer  
 
 **Implementation Date:** February 23, 2026  
+**Last Updated:** March 2026 (dataset tooltip, source badges, stats UI removed)  
 **Status:** ✅ Production-Ready  
 **Test Coverage:** 100% (4/4 tests passing)  
 **Servers:** Backend (8000) ✅ | Frontend (3000) ✅  

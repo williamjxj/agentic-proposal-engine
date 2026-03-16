@@ -15,14 +15,13 @@ import remarkGfm from 'remark-gfm'
 import { useSessionState } from '@/hooks/useSessionState'
 import {
   useProjects,
-  useProjectStats,
   useProjectDatasets,
   useDiscoverProjects,
   useCreateManualProject,
   useAppliedJobIds,
 } from '@/hooks/useProjects'
 import type { ProjectFilters } from '@/lib/api/client'
-import type { Project, ProjectStats, DatasetInfo } from '@/lib/api/client'
+import type { Project, DatasetInfo } from '@/lib/api/client'
 import { deleteManualProject } from '@/lib/api/client'
 import { LoadingSkeleton, CardListSkeleton } from '@/components/workflow/progress-overlay'
 import { PageHeader } from '@/components/shared/page-header'
@@ -34,7 +33,7 @@ import { Input } from '@/components/ui/input'
 import { EmptyState } from '@/components/shared/empty-state'
 import { useReduceMotion } from '@/hooks/useReduceMotion'
 import { cn } from '@/lib/utils'
-import { Search, Sparkles, FilePlus, X, Upload, Loader2, Trash2 } from 'lucide-react'
+import { Search, Sparkles, FilePlus, X, Upload, Loader2, Trash2, Info } from 'lucide-react'
 
 interface PageProjectFilters {
   search: string
@@ -46,6 +45,7 @@ interface PageProjectFilters {
   endDate?: string
   applied?: boolean
   sortBy?: string
+  datasetId?: string
 }
 
 function toApiFilters(f: PageProjectFilters): ProjectFilters {
@@ -59,6 +59,7 @@ function toApiFilters(f: PageProjectFilters): ProjectFilters {
     end_date: f.endDate || undefined,
     applied: f.applied,
     sort_by: f.sortBy,
+    dataset_id: f.datasetId || undefined,
   }
 }
 
@@ -82,6 +83,7 @@ const ProjectsHeader = memo(function ProjectsHeader({
   onOpenDiscover,
   onOpenManualUpload,
   isSearching,
+  datasets,
 }: {
   filters: PageProjectFilters
   onFiltersChange: (f: PageProjectFilters) => void
@@ -89,6 +91,7 @@ const ProjectsHeader = memo(function ProjectsHeader({
   onOpenDiscover: () => void
   onOpenManualUpload: () => void
   isSearching: boolean
+  datasets: DatasetInfo[]
 }) {
   const [showAdvanced, setShowAdvanced] = useState(false)
 
@@ -128,6 +131,60 @@ const ProjectsHeader = memo(function ProjectsHeader({
           >
             {isSearching ? 'Searching...' : 'Search'}
           </button>
+          <div className="inline-flex items-center gap-1">
+            <select
+              className="h-8 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded px-2 shrink-0 max-w-[200px] truncate"
+              value={filters.datasetId || datasets[0]?.id || ''}
+              onChange={(e) => {
+                const newFilters = { ...filters, datasetId: e.target.value }
+                onFiltersChange(newFilters)
+                onSearch(newFilters)
+              }}
+              title="Select Data Source"
+            >
+              {datasets.map(d => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
+            <div className="group relative shrink-0">
+              <span className="inline-flex cursor-help text-muted-foreground hover:text-foreground">
+                <Info className="h-4 w-4" />
+              </span>
+              <span
+                className="absolute left-1/2 bottom-full -translate-x-1/2 mb-2 invisible group-hover:visible z-50 w-64 p-2.5 bg-slate-900 text-white text-[11px] leading-relaxed rounded-lg shadow-xl text-left whitespace-normal"
+                role="tooltip"
+              >
+                {(() => {
+                  const currentId = filters.datasetId || datasets[0]?.id
+                  const currentDs = datasets.find((d) => d.id === currentId)
+                  const id = currentDs?.id ?? currentId ?? '—'
+                  const name = currentDs?.name ?? id
+                  const href = id !== '—' && !id.includes('freelancer') && !id.includes('manual')
+                    ? `https://huggingface.co/datasets/${id}`
+                    : null
+                  return (
+                    <>
+                      <span className="font-medium">Dataset Resource</span>
+                      <p className="mt-1">{name}</p>
+                      <p className="text-slate-300 font-mono text-[10px]">{id}</p>
+                      {href && (
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-1.5 inline-block text-primary hover:underline text-[10px]"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          View on HuggingFace →
+                        </a>
+                      )}
+                    </>
+                  )
+                })()}
+                <span className="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent border-t-slate-900" />
+              </span>
+            </div>
+          </div>
           <button
             type="button"
             onClick={onOpenDiscover}
@@ -224,169 +281,24 @@ const AI_TRENDING_SKILLS = new Set([
   'tensorflow', 'pytorch', 'automation', 'scripting', 'react', 'fastapi',
 ])
 
-/** Stats section - redesigned for AI/freelance trends 2025 */
-function ProjectsStats({
-  stats,
-  discoverCount,
-}: {
-  stats: ProjectStats | null
-  discoverCount?: number | null
-}) {
-  if (!stats) return null
+function getSourceLabel(
+  project: Project,
+  datasets: DatasetInfo[]
+): string {
+  const platform = (project.platform || '').toLowerCase()
+  const source = (project as { source?: string }).source || ''
 
-  const totalData = stats.total_data ?? stats.total_jobs ?? 0
-  // When showing Discover results, use discover count so stats match displayed projects
-  const totalOpportunities =
-    discoverCount != null ? discoverCount : stats.total_opportunities ?? stats.total_jobs ?? 0
-  const isDiscoverOverride = discoverCount != null
-  const dataSource =
-    stats.data_source ||
-    (stats.by_platform && Object.keys(stats.by_platform).length > 0 ? 'HuggingFace' : null) ||
-    '—'
-  const filterKeywords = stats.filter_keywords ?? '—'
-  const avgBudget = stats.avg_budget != null && stats.avg_budget > 0
-    ? `$${Math.round(stats.avg_budget).toLocaleString()}`
-    : null
+  if (platform === 'manual') return 'Manual'
+  if (platform === 'freelancer' || source.includes('freelancer')) return 'Freelancer'
 
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      <StatsCard
-        title="Total Data"
-        value={totalData}
-        tip="Records scraped from data source (before keyword filter)"
-        inline
-      />
-      <StatsCard
-        title="Total Opportunities"
-        value={totalOpportunities}
-        tip={
-          isDiscoverOverride
-            ? 'Jobs from Discover (displayed below; may use different keywords)'
-            : 'Records matching your keywords (after filter)'
-        }
-        highlight={totalOpportunities > 0 && totalOpportunities !== totalData}
-        inline
-      />
-      <StatsCard
-        title="Data Source"
-        value={dataSource}
-        tip="Where job data comes from (HuggingFace datasets, or live platforms when enabled)"
-        gradient
-        inline
-      />
-      <StatsCard
-        title="Filter Keywords"
-        value={filterKeywords}
-        tip="Keywords used for filtering (from /keywords or PROJECT_FILTER_KEYWORDS)"
-        keywords
-        inline
-      />
-      {avgBudget && (
-        <StatsCard
-          title="Avg. Budget"
-          value={avgBudget}
-          tip="Average project budget across listed opportunities"
-          inline
-        />
-      )}
-    </div>
-  )
-}
-
-function StatsCard({
-  title,
-  value,
-  tip,
-  highlight = false,
-  compact = false,
-  gradient = false,
-  keywords = false,
-  inline = false,
-}: {
-  title: string
-  value: string | number
-  tip?: string
-  highlight?: boolean
-  compact?: boolean
-  gradient?: boolean
-  keywords?: boolean
-  inline?: boolean
-}) {
-  const valueClassName = cn(
-    keywords
-      ? 'text-sm font-normal min-w-0 flex-1 break-words bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent'
-      : compact
-        ? 'text-sm font-normal bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent'
-        : cn(
-            'font-bold',
-            inline ? 'text-sm' : 'text-2xl tracking-tight',
-            typeof value === 'number' || gradient
-              ? 'bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent'
-              : highlight
-                ? 'text-primary'
-                : 'text-foreground'
-          )
-  )
-
-  if (inline) {
-    return (
-      <div
-        className={cn(
-          'group relative flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm min-w-0',
-          keywords ? 'flex-1' : 'inline-flex shrink-0',
-          highlight
-            ? 'border border-primary/40 bg-primary/5 dark:bg-primary/10 dark:border-primary/30'
-            : 'border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/50'
-        )}
-      >
-        <span className="text-muted-foreground font-medium shrink-0">{title}:</span>
-        <span className={valueClassName} title={typeof value === 'string' ? value : undefined}>
-          {value}
-        </span>
-        {tip && (
-          <span className="relative cursor-help text-muted-foreground/40 hover:text-primary ml-0.5 shrink-0">
-            ⓘ
-            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 invisible group-hover:visible w-56 p-2.5 bg-slate-900 text-white text-[11px] leading-relaxed rounded-lg shadow-xl z-50 text-center backdrop-blur-sm bg-opacity-95 border border-slate-700 pointer-events-none whitespace-normal">
-              {tip}
-              <span className="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent border-t-slate-900" />
-            </span>
-          </span>
-        )}
-      </div>
-    )
-  }
-
-  return (
-    <div
-      className={cn(
-        'group relative rounded-xl p-5 shadow-sm transition-all duration-300 hover:shadow-md',
-        keywords
-          ? 'border-none bg-white dark:bg-slate-900/50'
-          : highlight
-            ? 'border border-primary/40 bg-primary/5 dark:bg-primary/10 dark:border-primary/30'
-            : 'border border-slate-200 bg-white hover:border-primary/30 dark:border-slate-800 dark:bg-slate-900/50'
-      )}
-    >
-      <div className="flex items-center justify-between mb-2">
-        <p className="text-sm font-medium text-muted-foreground">{title}</p>
-        {tip && (
-          <div className="cursor-help text-muted-foreground/40 hover:text-primary transition-colors">
-            <span className="text-xs">ⓘ</span>
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 invisible group-hover:visible w-56 p-3 bg-slate-900 text-white text-[11px] rounded-lg shadow-xl z-20 text-center backdrop-blur-sm bg-opacity-95 border border-slate-700">
-              {tip}
-              <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-slate-900" />
-            </div>
-          </div>
-        )}
-      </div>
-      <p className={valueClassName}>{value}</p>
-    </div>
-  )
+  const ds = datasets.find((d) => d.id === source)
+  return ds?.name ?? (source || 'HuggingFace')
 }
 
 /** Results area - only this section shows loading/refreshing */
 const ProjectsResults = memo(function ProjectsResults({
   projects,
+  datasets,
   isLoading,
   searchHighlight,
   appliedJobIds = [],
@@ -397,6 +309,7 @@ const ProjectsResults = memo(function ProjectsResults({
   onManualDeleted,
 }: {
   projects: Project[]
+  datasets: DatasetInfo[]
   isLoading: boolean
   searchHighlight: string
   appliedJobIds?: string[]
@@ -444,6 +357,7 @@ const ProjectsResults = memo(function ProjectsResults({
           >
             <ProjectCard
               project={project}
+              datasets={datasets}
               highlight={searchHighlight}
               appliedJobIds={appliedJobIds}
               onManualDeleted={onManualDeleted}
@@ -507,11 +421,13 @@ function HighlightText({ text, highlight }: { text: string; highlight: string })
 
 function ProjectCard({
   project,
+  datasets,
   highlight,
   appliedJobIds = [],
   onManualDeleted,
 }: {
   project: Project
+  datasets: DatasetInfo[]
   highlight: string
   appliedJobIds?: string[]
   onManualDeleted: () => void
@@ -576,14 +492,9 @@ function ProjectCard({
                   Applied
                 </Badge>
               )}
-              <Badge variant="secondary" className="uppercase shrink-0">
-                {project.platform}
+              <Badge variant="outline" className="shrink-0" title={(project as { source?: string }).source}>
+                {getSourceLabel(project, datasets)}
               </Badge>
-              {(project as { source?: string }).source && (
-                <Badge variant="outline" className="text-xs shrink-0" title={`Source: ${(project as { source?: string }).source}`}>
-                  {(project as { source?: string }).source?.includes('freelancer') ? 'Freelancer' : 'HuggingFace'}
-                </Badge>
-              )}
             </div>
             <p className="text-sm font-medium text-muted-foreground mt-1 flex items-center gap-1.5">
               🏢 <HighlightText text={project.company} highlight={highlight} />
@@ -941,6 +852,7 @@ export default function ProjectsPage() {
     maxBudget: savedFilters.maxBudget,
     applied: savedFilters.applied || false,
     sortBy: savedFilters.sortBy || 'date',
+    datasetId: savedFilters.datasetId || '',
   })
   const [appliedFilters, setAppliedFilters] = useState<PageProjectFilters>(() => ({
     search: savedFilters.search || '',
@@ -950,6 +862,7 @@ export default function ProjectsPage() {
     maxBudget: savedFilters.maxBudget,
     applied: savedFilters.applied || false,
     sortBy: savedFilters.sortBy || 'date',
+    datasetId: savedFilters.datasetId || '',
   }))
   const [showDiscoverDialog, setShowDiscoverDialog] = useState(false)
   const [discoverKeywords, setDiscoverKeywords] = useState('')
@@ -961,7 +874,6 @@ export default function ProjectsPage() {
   const apiOffset = (currentPage - 1) * apiLimit
   const apiFilters = toApiFilters(appliedFilters)
   const { data: projectsData, isLoading, isFetching, refetch } = useProjects(apiFilters, apiLimit, apiOffset)
-  const { data: stats } = useProjectStats()
   const { data: datasets = [] } = useProjectDatasets()
   const { data: appliedJobIds = [] } = useAppliedJobIds()
   const discoverMutation = useDiscoverProjects()
@@ -1055,6 +967,7 @@ export default function ProjectsPage() {
         onOpenDiscover={() => setShowDiscoverDialog(true)}
         onOpenManualUpload={() => setShowManualUpload(true)}
         isSearching={isSearching}
+        datasets={datasets}
       />
 
       {isInitialLoad ? (
@@ -1068,10 +981,6 @@ export default function ProjectsPage() {
         </div>
       ) : (
         <>
-          <ProjectsStats
-              stats={stats ?? null}
-              discoverCount={discoverOverride ? discoverOverride.length : null}
-            />
           {discoveryResult && (
             <div className="rounded-lg border border-green-200 bg-green-50 p-4 relative dark:border-green-900 dark:bg-green-950">
               <button
@@ -1089,6 +998,7 @@ export default function ProjectsPage() {
 
           <ProjectsResults
               projects={projects}
+              datasets={datasets}
               isLoading={isFetching && projects.length === 0}
               searchHighlight={appliedFilters.search}
               appliedJobIds={appliedJobIds}
@@ -1105,7 +1015,6 @@ export default function ProjectsPage() {
                 refetch()
               }}
             />
-          )}
         </>
       )}
 

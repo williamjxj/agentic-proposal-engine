@@ -22,9 +22,6 @@ from app.services.auto_proposal_service import auto_generate_proposals
 
 logger = logging.getLogger(__name__)
 
-# HF dataset for discovery (matches projects router)
-HF_DATASET_ID = "jacob-hugging-face/job-descriptions"
-HF_JOB_LIMIT = 20
 
 
 async def run_autonomous_discovery_for_user(user_id: str) -> Dict[str, Any]:
@@ -60,9 +57,11 @@ async def run_autonomous_discovery_for_user(user_id: str) -> Dict[str, Any]:
     # Load and filter jobs from HuggingFace
     from app.etl.hf_loader import load_and_filter_hf_jobs
 
+    dataset_id = settings.hf_dataset_ids_list[0] if settings.hf_dataset_ids_list else "jacob-hugging-face/job-descriptions"
+    limit = min(settings.hf_job_limit, 50)
     records, _, _ = load_and_filter_hf_jobs(
-        dataset_id=HF_DATASET_ID,
-        limit=HF_JOB_LIMIT,
+        dataset_id=dataset_id,
+        limit=limit,
         keyword_filter=keywords,
     )
 

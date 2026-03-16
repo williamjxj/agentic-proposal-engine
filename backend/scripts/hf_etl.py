@@ -40,8 +40,12 @@ async def main() -> None:
     parser.add_argument(
         "--dataset-id",
         type=str,
-        default=os.getenv("HF_DATASET_ID", "jacob-hugging-face/job-descriptions"),
-        help="HuggingFace dataset ID",
+        help="Single HuggingFace dataset ID (default: first from HF_DATASET_IDS or HF_DATASET_ID)",
+    )
+    parser.add_argument(
+        "--all-datasets",
+        action="store_true",
+        help="Process all datasets from HF_DATASET_IDS",
     )
     parser.add_argument(
         "--limit",
@@ -70,14 +74,25 @@ async def main() -> None:
     if args.keywords:
         keywords = [k.strip() for k in args.keywords.split(",") if k.strip()]
 
-    from app.etl.hf_loader import load_and_filter_hf_jobs
+    from app.config import settings
+    from app.etl.hf_loader import load_and_filter_hf_jobs, run_hf_ingestion
 
+    if args.all_datasets:
+        ids = settings.hf_dataset_ids_list
+        total_inserted = total_updated = 0
+        for did in ids:
+            result = await run_hf_ingestion(dataset_id=did, limit=args.limit)
+            total_inserted += result.get("jobs_inserted", 0)
+            total_updated += result.get("jobs_updated", 0)
+        print(f"Processed {len(ids)} datasets: inserted={total_inserted}, updated={total_updated}")
+        return
+
+    dataset_id = args.dataset_id or (settings.hf_dataset_ids_list[0] if settings.hf_dataset_ids_list else "jacob-hugging-face/job-descriptions")
     records, extracted, filtered = load_and_filter_hf_jobs(
-        dataset_id=args.dataset_id,
+        dataset_id=dataset_id,
         limit=args.limit,
         keyword_filter=keywords,
     )
-
     print(f"Extracted: {extracted}, Filtered: {filtered}")
 
     if args.output:
@@ -85,7 +100,7 @@ async def main() -> None:
         data = {
             "metadata": {
                 "source": "hf_etl",
-                "dataset_id": args.dataset_id,
+                "dataset_id": dataset_id,
                 "timestamp": datetime.now().isoformat(),
                 "count": len(records),
             },
@@ -113,7 +128,7 @@ async def main() -> None:
         started = datetime.now(timezone.utc)
         inserted, updated = 0, 0
         if records:
-            inserted, updated = await upsert_jobs(records, etl_source=args.dataset_id)
+            inserted, updated = await upsert_jobs(records, etl_source=dataset_id)
         completed = datetime.now(timezone.utc)
         await record_etl_run(
             source="hf_etl_script",

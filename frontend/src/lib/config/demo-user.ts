@@ -4,7 +4,7 @@
  * Hide demo link if password is not configured.
  */
 
-const demoEmail = process.env.NEXT_PUBLIC_DEMO_EMAIL ?? 'jxjwilliam@2925.com'
+const demoEmail = process.env.NEXT_PUBLIC_DEMO_EMAIL ?? 'test@example.com'
 const demoPassword = process.env.NEXT_PUBLIC_DEMO_PASSWORD ?? ''
 
 export const demoUserConfig = {

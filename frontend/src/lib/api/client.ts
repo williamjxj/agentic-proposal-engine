@@ -915,6 +915,7 @@ export interface ProjectFilters {
   end_date?: string
   applied?: boolean
   sort_by?: string
+  dataset_id?: string
 }
 
 export interface ProjectListResponse {
@@ -1021,6 +1022,7 @@ export async function listProjects(
   if (filters?.end_date) params.append('end_date', filters.end_date)
   if (filters?.applied !== undefined) params.append('applied', String(filters.applied))
   if (filters?.sort_by) params.append('sort_by', filters.sort_by)
+  if (filters?.dataset_id) params.append('dataset_id', filters.dataset_id)
 
   const { data } = await apiClient.get<ProjectListResponse>(
     `${backend}/api/projects/list?${params.toString()}`
@@ -1042,9 +1044,12 @@ export async function chatWithProjects(query: string): Promise<{ response: strin
 /**
  * Get project statistics
  */
-export async function getProjectStats(): Promise<ProjectStats | null> {
+export async function getProjectStats(datasetId?: string): Promise<ProjectStats | null> {
   const backend = getBackendUrl()
-  const { data } = await apiClient.get<ProjectStats>(`${backend}/api/projects/stats`)
+  const params = new URLSearchParams()
+  if (datasetId) params.append('dataset_id', datasetId)
+  const url = `${backend}/api/projects/stats${params.toString() ? '?' + params.toString() : ''}`
+  const { data } = await apiClient.get<ProjectStats>(url)
   return data
 }
 

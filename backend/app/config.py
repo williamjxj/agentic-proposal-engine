@@ -83,6 +83,13 @@ class Settings(BaseSettings):
 
     # ETL / Job Persistence Configuration
     etl_use_persistence: bool = Field(default=False, alias="ETL_USE_PERSISTENCE")
+    hf_dataset_id: Optional[str] = Field(default=None, alias="HF_DATASET_ID")
+    hf_dataset_ids: Optional[str] = Field(
+        default=None,
+        alias="HF_DATASET_IDS",
+        description="Comma-separated HF dataset IDs; takes priority over HF_DATASET_ID",
+    )
+    hf_job_limit: int = Field(default=200, alias="HF_JOB_LIMIT")
     project_filter_keywords: Optional[str] = Field(
         default=None,
         alias="PROJECT_FILTER_KEYWORDS",
@@ -150,6 +157,15 @@ class Settings(BaseSettings):
     def cors_origins_list(self) -> List[str]:
         """Parse CORS origins into a list."""
         return [origin.strip() for origin in self.cors_origins.split(",")]
+
+    @property
+    def hf_dataset_ids_list(self) -> List[str]:
+        """Parse HF dataset IDs: HF_DATASET_IDS → HF_DATASET_ID → default."""
+        if self.hf_dataset_ids:
+            return [s.strip() for s in self.hf_dataset_ids.split(",") if s.strip()]
+        if self.hf_dataset_id:
+            return [self.hf_dataset_id.strip()]
+        return ["jacob-hugging-face/job-descriptions"]
 
     @property
     def max_file_size_bytes(self) -> int:

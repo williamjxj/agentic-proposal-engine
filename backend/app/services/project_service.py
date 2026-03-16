@@ -22,6 +22,23 @@ def _split_search_terms(search: str) -> List[str]:
     return [term for term in search.replace(",", " ").split() if term]
 
 
+def _parse_budget_value(value: Any) -> Optional[float]:
+    """Parse budget string (e.g. '$21 - $21', '$100') or number to float for DB."""
+    if value is None:
+        return None
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return float(value)
+    if isinstance(value, str):
+        import re
+        nums = re.findall(r"[\d,.]+", value.replace(",", ""))
+        if nums:
+            try:
+                return float(nums[0].replace(",", ""))
+            except (ValueError, TypeError):
+                pass
+    return None
+
+
 def _parse_posted_at(value: Any) -> Optional[datetime]:
     """Parse posted_at from str or datetime to datetime for asyncpg."""
     if value is None:
@@ -91,8 +108,8 @@ async def upsert_projects(records: List[JobRecord], etl_source: str = "hf_loader
                 rec.title,
                 rec.description,
                 rec.skills_required or [],
-                rec.budget_min,
-                rec.budget_max,
+                _parse_budget_value(rec.budget_min),
+                _parse_budget_value(rec.budget_max),
                 rec.budget_currency,
                 rec.employer_name,
                 rec.etl_source or etl_source,
@@ -121,6 +138,7 @@ async def list_projects(
     applied: Optional[bool] = None,
     user_id: Optional[str] = None,
     sort_by: str = "date",
+    dataset_id: Optional[str] = None,
 ) -> tuple[List[Dict[str, Any]], int]:
     """
     List projects with filters and pagination.
@@ -152,6 +170,18 @@ async def list_projects(
         params.append(platform)
         conditions.append(f"p.platform::text = ${idx}")
         idx += 1
+
+    # Dataset/source filter: HF id → etl_source; freelancer/manual → platform
+    if dataset_id and str(dataset_id).strip():
+        did = str(dataset_id).strip()
+        if did == "freelancer":
+            conditions.append("p.platform::text = 'freelancer'")
+        elif did == "manual":
+            conditions.append("p.platform::text = 'manual'")
+        else:
+            params.append(did)
+            conditions.append(f"p.etl_source = ${idx}")
+            idx += 1
 
     if category:
         params.append(f"%{category}%")
@@ -646,8 +676,8 @@ async def create_manual_project(user_id: str, project_data: Any) -> Dict[str, An
             project_data.title,
             project_data.description,
             project_data.skills or [],
-            project_data.budget_min,
-            project_data.budget_max,
+            _parse_budget_value(getattr(project_data, "budget_min", None)),
+            _parse_budget_value(getattr(project_data, "budget_max", None)),
             "USD",
             project_data.company,
             "manual_upload",

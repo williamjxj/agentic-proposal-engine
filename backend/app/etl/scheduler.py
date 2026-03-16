@@ -20,12 +20,11 @@ scheduler: Optional[AsyncIOScheduler] = None
 
 async def _run_hf_ingestion_job() -> None:
     """
-    Scheduled job: run HF ingestion.
-    AsyncIOScheduler executes async functions in the event loop.
+    Scheduled job: run HF ingestion for all datasets in HF_DATASET_IDS.
     """
-    from app.etl.hf_loader import run_hf_ingestion
+    from app.etl.hf_loader import run_hf_ingestion_multi
 
-    result = await run_hf_ingestion()
+    result = await run_hf_ingestion_multi()
     logger.info("HF ingestion completed: %s", result)
 
 

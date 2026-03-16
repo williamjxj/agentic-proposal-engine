@@ -102,6 +102,38 @@ def load_and_filter_hf_jobs(
     return records, total_extracted, total_filtered
 
 
+async def run_hf_ingestion_multi(limit_per_dataset: int = 200) -> dict:
+    """
+    Run HF ingestion for all datasets in HF_DATASET_IDS.
+    Returns aggregated result.
+    """
+    from app.config import settings
+
+    ids = settings.hf_dataset_ids_list
+    total_inserted = 0
+    total_updated = 0
+    last_run_id = 0
+    last_status = "success"
+
+    for dataset_id in ids:
+        result = await run_hf_ingestion(
+            dataset_id=dataset_id,
+            limit=min(limit_per_dataset, settings.hf_job_limit),
+        )
+        total_inserted += result.get("jobs_inserted", 0)
+        total_updated += result.get("jobs_updated", 0)
+        last_run_id = result.get("etl_run_id", 0)
+        last_status = result.get("status", "success")
+
+    return {
+        "etl_run_id": last_run_id,
+        "status": last_status,
+        "datasets_processed": len(ids),
+        "jobs_inserted": total_inserted,
+        "jobs_updated": total_updated,
+    }
+
+
 async def run_hf_ingestion(
     dataset_id: str = "jacob-hugging-face/job-descriptions",
     limit: int = 200,

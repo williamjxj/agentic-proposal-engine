@@ -21,7 +21,7 @@ export const projectKeys = {
   all: ['projects'] as const,
   lists: () => [...projectKeys.all, 'list'] as const,
   list: (filters?: ProjectFilters, limit?: number, offset?: number) => [...projectKeys.lists(), filters, limit, offset] as const,
-  stats: () => [...projectKeys.all, 'stats'] as const,
+  stats: (datasetId?: string) => [...projectKeys.all, 'stats', datasetId] as const,
   datasets: () => [...projectKeys.all, 'datasets'] as const,
   appliedIds: () => ['projects', 'applied-ids'] as const,
 }
@@ -47,10 +47,10 @@ export function useProjects(
 /**
  * Project stats - cache longer (changes less frequently)
  */
-export function useProjectStats() {
+export function useProjectStats(datasetId?: string) {
   return useQuery({
-    queryKey: projectKeys.stats(),
-    queryFn: getProjectStats,
+    queryKey: projectKeys.stats(datasetId),
+    queryFn: () => getProjectStats(datasetId),
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000,
   })

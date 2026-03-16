@@ -47,10 +47,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
-# Configuration from environment variables
 USE_HF_DATASET = os.getenv("USE_HF_DATASET", "true").lower() == "true"
-HF_DATASET_ID = os.getenv("HF_DATASET_ID", "jacob-hugging-face/job-descriptions")
-HF_JOB_LIMIT = int(os.getenv("HF_JOB_LIMIT", "100"))
 
 
 @router.post("/discover", response_model=ProjectDiscoverResponse)
@@ -93,28 +90,54 @@ async def discover_projects(
 
     logger.info(f"User {current_user.id} discovering projects with keywords: {keywords}")
 
-    # When ETL persistence enabled: load via hf_loader (domain filter), upsert, return from DB (T027-T030)
-    if settings.etl_use_persistence and USE_HF_DATASET:
-        try:
-            from app.etl.hf_loader import load_and_filter_hf_jobs
-
-            dataset_id = getattr(request, "dataset_id", None) or HF_DATASET_ID
-            records, _, _ = load_and_filter_hf_jobs(
-                dataset_id=dataset_id,
-                limit=min(request.max_results, HF_JOB_LIMIT),
-                keyword_filter=keywords,
-            )
-            if records:
-                await upsert_jobs(records, etl_source=dataset_id)
-                fingerprints = [r.fingerprint_hash for r in records]
-                jobs = await get_projects_by_fingerprints(
-                    fingerprints,
+    # When ETL persistence enabled
+    if settings.etl_use_persistence:
+        dataset_id = getattr(request, "dataset_id", None) or (settings.hf_dataset_ids_list[0] if settings.hf_dataset_ids_list else None)
+        # Freelancer/manual: list from DB only (no HF fetch)
+        if dataset_id in ("freelancer", "manual"):
+            try:
+                jobs, total = await list_projects_svc(
+                    limit=min(request.max_results, settings.hf_job_limit),
+                    offset=0,
+                    search=",".join(keywords) if keywords else None,
                     user_id=str(current_user.id),
+                    dataset_id=dataset_id,
                 )
-            else:
-                jobs = []
+                return ProjectDiscoverResponse(
+                    success=True,
+                    source="database",
+                    dataset_id=dataset_id,
+                    dataset_used=dataset_id,
+                    count=len(jobs),
+                    total=total,
+                    jobs=jobs,
+                    keywords_searched=keywords,
+                )
+            except Exception as e:
+                logger.exception("Discover (DB list) failed: %s", e)
+                raise HTTPException(status_code=500, detail=str(e))
 
-            return ProjectDiscoverResponse(
+        # HF dataset: load via hf_loader, upsert, return from DB
+        if USE_HF_DATASET and dataset_id:
+            try:
+                from app.etl.hf_loader import load_and_filter_hf_jobs
+
+                records, _, _ = load_and_filter_hf_jobs(
+                    dataset_id=dataset_id,
+                    limit=min(request.max_results, settings.hf_job_limit),
+                    keyword_filter=keywords,
+                )
+                if records:
+                    await upsert_jobs(records, etl_source=dataset_id)
+                    fingerprints = [r.fingerprint_hash for r in records]
+                    jobs = await get_projects_by_fingerprints(
+                        fingerprints,
+                        user_id=str(current_user.id),
+                    )
+                else:
+                    jobs = []
+
+                return ProjectDiscoverResponse(
                 success=True,
                 source="database",
                 dataset_id=dataset_id,
@@ -124,19 +147,51 @@ async def discover_projects(
                 jobs=jobs,
                 keywords_searched=keywords,
             )
-        except Exception as e:
-            logger.exception("Discover (ETL persistence) failed: %s", e)
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to discover projects: {str(e)}",
-            )
+            except Exception as e:
+                logger.exception("Discover (ETL persistence) failed: %s", e)
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to discover projects: {str(e)}",
+                )
+
+        # ETL persistence but no HF dataset selected - list from DB
+        jobs, total = await list_projects_svc(
+            limit=min(request.max_results, settings.hf_job_limit),
+            offset=0,
+            search=",".join(keywords) if keywords else None,
+            user_id=str(current_user.id),
+            dataset_id=dataset_id,
+        )
+        return ProjectDiscoverResponse(
+            success=True,
+            source="database",
+            dataset_id=dataset_id or "",
+            dataset_used=dataset_id or "",
+            count=len(jobs),
+            total=total,
+            jobs=jobs,
+            keywords_searched=keywords,
+        )
 
     if USE_HF_DATASET:
         # Fallback: load from HuggingFace without persisting (ETL_USE_PERSISTENCE=false)
         try:
+            target_dataset = getattr(request, "dataset_id", None) or (settings.hf_dataset_ids_list[0] if settings.hf_dataset_ids_list else "jacob-hugging-face/job-descriptions")
+            # Freelancer/manual require ETL persistence (DB)
+            if target_dataset in ("freelancer", "manual"):
+                return ProjectDiscoverResponse(
+                    success=True,
+                    source="database",
+                    dataset_id=target_dataset,
+                    dataset_used=target_dataset,
+                    count=0,
+                    total=0,
+                    jobs=[],
+                    keywords_searched=keywords,
+                )
             jobs, _ = fetch_hf_jobs(
-                dataset_id=HF_DATASET_ID,
-                limit=min(request.max_results, HF_JOB_LIMIT),
+                dataset_id=target_dataset,
+                limit=min(request.max_results, settings.hf_job_limit),
                 keyword_filter=keywords
             )
 
@@ -148,8 +203,8 @@ async def discover_projects(
             return ProjectDiscoverResponse(
                 success=True,
                 source="huggingface_dataset",
-                dataset_id=HF_DATASET_ID,
-                dataset_used=HF_DATASET_ID,
+                dataset_id=target_dataset,
+                dataset_used=target_dataset,
                 count=len(jobs),
                 total=len(jobs),
                 jobs=jobs,
@@ -227,6 +282,7 @@ async def list_projects(
     end_date: Optional[str] = Query(None),
     applied: Optional[bool] = Query(None),
     sort_by: Optional[str] = Query("date"),
+    dataset_id: Optional[str] = Query(None),
     current_user: UserResponse = Depends(get_current_user)
 ):
     """
@@ -235,6 +291,7 @@ async def list_projects(
     When search is omitted, uses user's active keywords or PROJECT_FILTER_KEYWORDS (006).
     """
     logger.info(f"User {current_user.email} listing projects (limit={limit}, offset={offset})")
+    target_dataset = dataset_id if dataset_id else (settings.hf_dataset_ids_list[0] if settings.hf_dataset_ids_list else None)
 
     # Resolve filter keywords: search param > user keywords > system fallback > None (show all)
     filter_search = search
@@ -266,6 +323,7 @@ async def list_projects(
                 applied=applied,
                 user_id=str(current_user.id),
                 sort_by=sort_by or "date",
+                dataset_id=dataset_id,
             )
             current_page = (offset // limit) + 1
             total_pages = (total + limit - 1) // limit if limit > 0 else 1
@@ -276,7 +334,7 @@ async def list_projects(
                 pages=total_pages,
                 limit=limit,
                 source="database",
-                dataset_id=HF_DATASET_ID,
+                dataset_id=target_dataset,
             )
         except Exception as e:
             logger.error(f"Failed to list jobs from database: {e}")
@@ -289,11 +347,36 @@ async def list_projects(
 
     if USE_HF_DATASET:
         try:
-            # For HF dataset, we fetch a larger pool and filter/sort locally
-            # since the HF streaming API doesn't support complex server-side queries
+            # Freelancer/manual are not HF datasets — load from DB only
+            if target_dataset in ("freelancer", "manual"):
+                jobs, total = await list_projects_svc(
+                    limit=limit,
+                    offset=offset,
+                    search=filter_search,
+                    platform=platform,
+                    category=category,
+                    status_filter=status,
+                    applied=applied,
+                    user_id=str(current_user.id),
+                    sort_by=sort_by or "date",
+                    dataset_id=dataset_id,
+                )
+                current_page = (offset // limit) + 1
+                total_pages = (total + limit - 1) // limit if limit > 0 else 1
+                return ProjectListResponse(
+                    jobs=jobs,
+                    total=total,
+                    page=current_page,
+                    pages=total_pages,
+                    limit=limit,
+                    source="database",
+                    dataset_id=target_dataset,
+                )
+
+            # For HF dataset, fetch from HuggingFace then merge with DB
             fetch_limit = max(limit * 2, 200)
             jobs, _ = fetch_hf_jobs(
-                dataset_id=HF_DATASET_ID,
+                dataset_id=target_dataset or settings.hf_dataset_ids_list[0],
                 limit=fetch_limit,
                 keyword_filter=keywords
             )
@@ -311,6 +394,7 @@ async def list_projects(
                     applied=applied,
                     user_id=str(current_user.id),
                     sort_by=sort_by or "date",
+                    dataset_id=dataset_id,
                 )
                 jobs.extend(db_jobs)
             except Exception as e:
@@ -368,7 +452,7 @@ async def list_projects(
                 pages=total_pages,
                 limit=limit,
                 source="huggingface",
-                dataset_id=HF_DATASET_ID
+                dataset_id=target_dataset
             )
 
         except Exception as e:
@@ -400,7 +484,10 @@ async def chat_with_projects(
 
     # In HF mode, we'll fetch some sample jobs for context
     if USE_HF_DATASET:
-        jobs, _ = fetch_hf_jobs(dataset_id=HF_DATASET_ID, limit=10)
+        jobs, _ = fetch_hf_jobs(
+            dataset_id=settings.hf_dataset_ids_list[0] if settings.hf_dataset_ids_list else "jacob-hugging-face/job-descriptions",
+            limit=10
+        )
         jobs_summary = "\n".join([
             f"- {j.get('title')} ({j.get('platform')}): {j.get('description')[:100]}..."
             for j in jobs
@@ -442,13 +529,14 @@ async def list_available_datasets():
 
     return {
         "datasets": datasets,
-        "current": HF_DATASET_ID,
+        "current": settings.hf_dataset_ids_list[0] if settings.hf_dataset_ids_list else "jacob-hugging-face/job-descriptions",
         "mode": "huggingface" if USE_HF_DATASET else "scraper"
     }
 
 
 @router.get("/stats")
 async def get_project_stats(
+    dataset_id: Optional[str] = Query(None),
     current_user: UserResponse = Depends(get_current_user)
 ):
     """
@@ -518,9 +606,18 @@ async def get_project_stats(
                 ]
 
         try:
+            target_dataset = dataset_id if dataset_id else (settings.hf_dataset_ids_list[0] if settings.hf_dataset_ids_list else "jacob-hugging-face/job-descriptions")
+            # Freelancer/manual: use DB stats only (no HF fetch)
+            if target_dataset in ("freelancer", "manual"):
+                stats = await get_stats(
+                    keyword_filter=",".join(filter_keywords) if filter_keywords else None,
+                )
+                stats["filter_keywords"] = ", ".join(filter_keywords) if filter_keywords else "—"
+                stats["data_source"] = "Database"
+                return stats
             jobs, total_scanned = fetch_hf_jobs(
-                dataset_id=HF_DATASET_ID,
-                limit=HF_JOB_LIMIT,
+                dataset_id=target_dataset,
+                limit=settings.hf_job_limit,
                 keyword_filter=filter_keywords if filter_keywords else None,
             )
 
@@ -669,7 +766,7 @@ async def health_check():
         "status": "healthy",
         "service": "projects",
         "mode": "huggingface" if USE_HF_DATASET else "scraper",
-        "dataset": HF_DATASET_ID if USE_HF_DATASET else None
+        "dataset": (settings.hf_dataset_ids_list[0] if settings.hf_dataset_ids_list else None) if USE_HF_DATASET else None
     }
 
 

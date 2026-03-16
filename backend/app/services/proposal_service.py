@@ -32,6 +32,15 @@ async def _get_proposals_columns(db) -> set[str]:
     return _PROPOSAL_COLUMNS_CACHE
 
 
+def _normalize_budget(value: object) -> Optional[str]:
+    """Convert DB budget (Decimal/numeric) to string for Proposal model."""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    return str(value)
+
+
 def _row_to_proposal(row: dict) -> Proposal:
     """Convert database row to Proposal model."""
     proposal_title = row.get("proposal_title") or row.get("title")
@@ -49,7 +58,7 @@ def _row_to_proposal(row: dict) -> Proposal:
         title=proposal_title,
         proposal_title=proposal_title,
         description=row["description"],
-        budget=row["budget"],
+        budget=_normalize_budget(row.get("budget")),
         timeline=row["timeline"],
         skills=row["skills"] if row["skills"] else [],
         job_url=row["job_url"],
@@ -162,6 +171,20 @@ async def get_proposal(proposal_id: UUID, user_id: UUID) -> Optional[Proposal]:
     return _row_to_proposal(dict(row))
 
 
+def _parse_budget_for_db(value: Optional[str]) -> Optional[float]:
+    """Parse budget string (e.g. '$21 - $21') to float for proposals.budget DECIMAL column."""
+    if not value or not isinstance(value, str):
+        return None
+    import re
+    nums = re.findall(r"[\d,.]+", value.replace(",", ""))
+    if nums:
+        try:
+            return float(nums[0].replace(",", ""))
+        except (ValueError, TypeError):
+            pass
+    return None
+
+
 async def create_proposal(
     user_id: UUID,
     proposal_data: ProposalCreate,
@@ -217,7 +240,7 @@ async def create_proposal(
             proposal_title_val,
             project_title_val,
             proposal_data.description,
-            proposal_data.budget,
+            _parse_budget_for_db(proposal_data.budget),
             proposal_data.timeline,
             proposal_data.skills,
             project_id_val,
@@ -245,7 +268,7 @@ async def create_proposal(
             user_id,
             proposal_title_val,
             proposal_data.description,
-            proposal_data.budget,
+            _parse_budget_for_db(proposal_data.budget),
             proposal_data.timeline,
             proposal_data.skills,
             project_id_val,

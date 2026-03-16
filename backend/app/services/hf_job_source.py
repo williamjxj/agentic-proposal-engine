@@ -1,20 +1,15 @@
 """
 HuggingFace Dataset Job Source Service
 
-Temporary replacement for Crawlee scraping.
-Loads job postings from HuggingFace datasets and normalizes
-them to match the platform's Job schema.
-
-This is a drop-in replacement for web scraping that allows
-development and testing without rate limits or legal concerns.
+Loads job postings from HuggingFace datasets and normalizes them
+to match the platform's Job schema via source adapters (etl/source_adapters.py).
 """
 
 from datasets import load_dataset
 from typing import List, Optional, Dict, Any
-import hashlib
 import logging
-from datetime import datetime, timedelta
-import random
+
+from app.etl.source_adapters import normalize_to_canonical
 
 logger = logging.getLogger(__name__)
 
@@ -22,187 +17,12 @@ logger = logging.getLogger(__name__)
 def normalize_hf_job(record: dict, source_dataset: str) -> dict:
     """
     Map a raw HF dataset row → internal Job dict.
-
-    Handles multiple dataset formats and normalizes to standard schema.
-
-    Args:
-        record: Raw dataset record
-        source_dataset: HuggingFace dataset ID for format-specific handling
-
-    Returns:
-        Normalized job dictionary matching internal schema
+    Delegates to source adapters.
     """
-
-    # jacob-hugging-face/job-descriptions format
-    # Schema: company_name, job_description, position_title, description_length, model_response
-    if source_dataset == "jacob-hugging-face/job-descriptions":
-        title = record.get("position_title") or record.get("job_title") or "Unknown Title"
-        return {
-            "id": hashlib.md5(
-                f"{record.get('position_title', '')}{record.get('job_description', '')[:100]}".encode()
-            ).hexdigest(),
-            "external_id": hashlib.md5(
-                record.get("job_description", "")[:80].encode()
-            ).hexdigest(),
-            "platform": "huggingface_dataset",
-            "title": title,
-            "company": record.get("company_name", "Unknown Company"),
-            "description": record.get("job_description", ""),
-            "requirements": record.get("job_requirements", ""),
-            "model_response": record.get("model_response", ""),  # AI-generated analysis for proposals
-            "skills": _extract_skills_from_text(record.get("job_requirements", ""))
-                or _extract_skills_from_text(record.get("job_description", "")[:500]),
-            "budget_min": None,
-            "budget_max": None,
-            "budget_type": "fixed",
-            "url": "",
-            "posted_at": _generate_recent_date(),
-            "source": source_dataset,
-            "status": "new",
-            "client_rating": round(random.uniform(4.0, 5.0), 1)
-        }
-
-    # lukebarousse/data_jobs format
-    elif source_dataset == "lukebarousse/data_jobs":
-        skills = record.get("job_skills", [])
-        if isinstance(skills, str):
-            skills = [s.strip() for s in skills.split(",") if s.strip()]
-
-        job_title = record.get("job_title_short") or record.get("job_title") or "Unknown Title"
-        return {
-            "id": str(record.get("job_id", hashlib.md5(
-                f"{job_title}{record.get('company_name', '')}".encode()
-            ).hexdigest())),
-            "external_id": str(record.get("job_id", hashlib.md5(
-                str(job_title)[:80].encode()
-            ).hexdigest())),
-            "platform": "huggingface_dataset",
-            "title": job_title,
-            "company": record.get("company_name", ""),
-            "description": record.get("job_description", ""),
-            "requirements": "",
-            "skills": skills if isinstance(skills, list) else [],
-            "budget_min": record.get("salary_year_avg"),
-            "budget_max": record.get("salary_year_max"),
-            "budget_type": "fixed",
-            "url": record.get("job_posting_url", ""),
-            "posted_at": record.get("job_posted_date", _generate_recent_date()),
-            "source": source_dataset,
-            "status": "new",
-            "client_rating": round(random.uniform(4.0, 5.0), 1)
-        }
-
-    # debasmitamukherjee/IT_job_postings format
-    elif "IT_job_postings" in source_dataset or "it_job" in source_dataset.lower():
-        return {
-            "id": hashlib.md5(
-                f"{record.get('Job Title', '')}{record.get('Company', '')}".encode()
-            ).hexdigest(),
-            "external_id": hashlib.md5(
-                str(record.get("Job Title", ""))[:80].encode()
-            ).hexdigest(),
-            "platform": "huggingface_dataset",
-            "title": record.get("Job Title", record.get("title", "Unknown Title")),
-            "company": record.get("Company", record.get("company", "Tech Company")),
-            "description": record.get("Job Description", record.get("description", "")),
-            "requirements": record.get("Requirements", record.get("requirements", "")),
-            "skills": _extract_skills_from_text(
-                record.get("Skills", record.get("skills", ""))
-            ),
-            "budget_min": record.get("Salary", record.get("salary")),
-            "budget_max": None,
-            "budget_type": "fixed",
-            "url": "",
-            "posted_at": _generate_recent_date(),
-            "source": source_dataset,
-            "status": "new",
-            "client_rating": round(random.uniform(4.0, 5.0), 1)
-        }
-
-    # Generic fallback: pass through with sensible defaults
-    # Try common column names across HF job datasets
-    title = (
-        record.get("title")
-        or record.get("job_title")
-        or record.get("position_title")
-        or record.get("Job Title")
-        or "Unknown Title"
+    return normalize_to_canonical(
+        dict(record) if not isinstance(record, dict) else record,
+        source_dataset,
     )
-    return {
-        "id": hashlib.md5(
-            f"{title}{record.get('company', '')}{record.get('description', '')[:50]}".encode()
-        ).hexdigest(),
-        "external_id": hashlib.md5(
-            str(title)[:80].encode()
-        ).hexdigest(),
-        "platform": "huggingface_dataset",
-        "title": title,
-        "company": record.get("company", record.get("company_name", "Company")),
-        "description": record.get("description", record.get("job_description", "")),
-        "requirements": record.get("requirements", record.get("job_requirements", "")),
-        "skills": _extract_skills_from_text(
-            record.get("skills", record.get("job_skills", ""))
-        ),
-        "budget_min": None,
-        "budget_max": None,
-        "budget_type": "fixed",
-        "url": record.get("url", ""),
-        "posted_at": _generate_recent_date(),
-        "source": source_dataset,
-        "status": "new",
-        "client_rating": round(random.uniform(4.0, 5.0), 1)
-    }
-
-
-# Common tech terms to extract from job descriptions when no structured skills exist
-# Ordered: AI/trending first, then modern dev, then foundational (matches 2025 Upwork trends)
-_COMMON_TECH_TERMS = [
-    # AI & emerging (Upwork 2025: Generative AI, AI data annotation, agentic)
-    "python", "machine learning", "deep learning", "tensorflow", "pytorch",
-    "langchain", "llm", "nlp", "transformers", "openai", "generative ai",
-    "ai", "agentic", "chatbot", "data science", "data analytics",
-    # Modern dev (scripting, automation, full-stack)
-    "javascript", "typescript", "react", "node", "fastapi", "django", "flask",
-    "vue", "angular", "sql", "postgresql", "mongodb", "redis",
-    "docker", "kubernetes", "aws", "azure", "gcp",
-    "pandas", "numpy", "automation", "scripting",
-    # Foundational
-    "html", "css", "git", "rest", "api", "graphql",
-]
-
-def _extract_skills_from_text(text: str) -> List[str]:
-    """
-    Extract skills from text field.
-
-    Handles comma-separated, pipe-separated, and other formats.
-    Falls back to common tech term detection for long unstructured text.
-    """
-    if not text or not isinstance(text, str):
-        return []
-
-    # Try common separators
-    for sep in [",", "|", ";", "/"]:
-        if sep in text:
-            skills = [s.strip() for s in text.split(sep)]
-            result = [s for s in skills if s and len(s) < 50]
-            if result:
-                return result
-
-    # If no separator, return as single skill if reasonable length
-    if len(text) < 50:
-        return [text.strip()] if text.strip() else []
-
-    # Fallback: extract known tech terms from long text (e.g. job descriptions)
-    text_lower = text.lower()
-    found = [term for term in _COMMON_TECH_TERMS if term in text_lower]
-    return list(dict.fromkeys(found))  # preserve order, dedupe
-
-
-def _generate_recent_date() -> str:
-    """Generate a recent posted date (last 30 days)."""
-    days_ago = random.randint(0, 30)
-    posted_date = datetime.now() - timedelta(days=days_ago)
-    return posted_date.isoformat()
 
 
 def fetch_hf_jobs(
@@ -249,7 +69,7 @@ def fetch_hf_jobs(
             ds = load_dataset(dataset_id, split=split)
         except Exception as e2:
             logger.error(f"Failed to load dataset even without streaming: {e2}")
-            return []
+            return [], 0
 
     jobs = []
     processed = 0
@@ -291,39 +111,115 @@ def fetch_hf_jobs(
     return jobs, processed
 
 
+def fetch_hf_jobs_multi(
+    dataset_ids: Optional[List[str]] = None,
+    split: str = "train",
+    limit_per_dataset: int = 50,
+    keyword_filter: Optional[List[str]] = None,
+) -> tuple[List[dict], int]:
+    """
+    Load jobs from multiple HuggingFace datasets, merge and deduplicate.
+    Returns (jobs list, total_processed count).
+    """
+    from app.config import settings
+
+    ids = dataset_ids or settings.hf_dataset_ids_list
+    all_jobs: List[dict] = []
+    seen_fp: set[str] = set()
+    total_processed = 0
+
+    for did in ids:
+        jobs, processed = fetch_hf_jobs(
+            dataset_id=did,
+            split=split,
+            limit=limit_per_dataset,
+            keyword_filter=keyword_filter,
+        )
+        total_processed += processed
+        for j in jobs:
+            fp = j.get("external_id") or j.get("id", "")
+            if fp and fp not in seen_fp:
+                seen_fp.add(fp)
+                all_jobs.append(j)
+
+    return all_jobs, total_processed
+
+
 def get_available_datasets() -> List[Dict[str, Any]]:
     """
-    Get list of recommended HuggingFace datasets for job data.
-
-    Returns:
-        List of dataset info dictionaries
+    Get list of available data sources: HF datasets from config + freelancer + manual.
     """
-    return [
-        {
+    from app.config import settings
+
+    hf_ids = settings.hf_dataset_ids_list
+    static: Dict[str, Dict[str, Any]] = {
+        "jacob-hugging-face/job-descriptions": {
             "id": "jacob-hugging-face/job-descriptions",
             "name": "Job Descriptions",
             "description": "Clean title, company, description, requirements",
             "recommended": True,
             "size": "~5K+ jobs",
-            "best_for": "General freelance-style postings"
+            "best_for": "General freelance-style postings",
         },
-        {
+        "lukebarousse/data_jobs": {
             "id": "lukebarousse/data_jobs",
             "name": "Data Jobs (2023)",
-            "description": "30K+ real job postings from Google with skills, salary",
+            "description": "30K+ real job postings with skills, salary",
             "recommended": True,
             "size": "30K+ jobs",
-            "best_for": "Large variety, salary data, skills arrays"
+            "best_for": "Large variety, salary data",
         },
-        {
+        "datastax/linkedin_job_listings": {
+            "id": "datastax/linkedin_job_listings",
+            "name": "LinkedIn Job Listings",
+            "description": "LinkedIn-style postings with min/max salary",
+            "recommended": False,
+            "size": "~10K+ jobs",
+            "best_for": "Corporate job data",
+        },
+        "debasmitamukherjee/IT_job_postings": {
             "id": "debasmitamukherjee/IT_job_postings",
             "name": "IT Job Postings",
             "description": "Tech-focused postings with skills, salary",
             "recommended": False,
             "size": "~10K+ jobs",
-            "best_for": "Tech-specific jobs"
-        }
-    ]
+            "best_for": "Tech-specific jobs",
+        },
+        "freelancer": {
+            "id": "freelancer",
+            "name": "Freelancer.com",
+            "description": "Scraped jobs from Freelancer.com",
+            "recommended": False,
+            "size": "Varies",
+            "best_for": "Live platform jobs",
+        },
+        "manual": {
+            "id": "manual",
+            "name": "Manual / Upload",
+            "description": "Manually added or bulk-uploaded jobs",
+            "recommended": False,
+            "size": "User-defined",
+            "best_for": "Custom job sources",
+        },
+    }
+    # Build list: HF datasets from config first, then freelancer, manual
+    result: List[Dict[str, Any]] = []
+    for did in hf_ids:
+        if did in static:
+            result.append(static[did])
+        else:
+            result.append({
+                "id": did,
+                "name": did.split("/")[-1] if "/" in did else did,
+                "description": "HuggingFace dataset",
+                "recommended": False,
+                "size": "Unknown",
+                "best_for": "General",
+            })
+    for sid in ("freelancer", "manual"):
+        if sid not in [r["id"] for r in result]:
+            result.append(static[sid])
+    return result
 
 
 def search_hf_jobs(
